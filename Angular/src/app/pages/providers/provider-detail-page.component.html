@@ -1,0 +1,84 @@
+@if (providerError(); as err) {
+  <app-error-banner title="Unable to load provider" [message]="err" (retry)="retryProvider()"></app-error-banner>
+}
+
+@if (loadingProvider() && !provider()) {
+  <app-loading-state label="Loading provider…"></app-loading-state>
+} @else if (!provider()) {
+  <app-empty-state
+    title="Provider not found"
+    description="The requested provider does not exist.">
+  </app-empty-state>
+} @else {
+  <div class="provider-detail">
+    <div class="profile-header">
+      <span class="profile-avatar">
+        {{ (provider()?.firstName?.[0] ?? '') + (provider()?.lastName?.[0] ?? '') }}
+      </span>
+      <div class="profile-meta">
+        <div class="profile-name">
+          Dr. {{ provider()?.firstName }} {{ provider()?.lastName }}, {{ provider()?.title }}
+        </div>
+        <div class="profile-subtitle">
+          {{ provider()?.specialty }} • {{ provider()?.locationName }}
+        </div>
+        <div class="profile-extra">
+          NPI: {{ provider()?.npiNumber }} • {{ provider()?.phoneNumber }}
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-row">
+      <app-kpi-card title="Appointments Today" [value]="kpis().apptsToday" [loading]="apptsState.loading">
+        <ng-template #icon><svg lucideCalendarDays [size]="16" [strokeWidth]="2"></svg></ng-template>
+      </app-kpi-card>
+      <app-kpi-card title="Patients This Week" [value]="kpis().patientsThisWeek" [loading]="apptsState.loading">
+        <ng-template #icon><svg lucideUsers [size]="16" [strokeWidth]="2"></svg></ng-template>
+      </app-kpi-card>
+      <app-kpi-card title="Utilization" [value]="overallUtilizationLabel()" [loading]="utilizationState.loading">
+        <ng-template #icon><svg lucideActivity [size]="16" [strokeWidth]="2"></svg></ng-template>
+      </app-kpi-card>
+      <app-kpi-card title="Cancellation Rate" [value]="cancellationRateLabel()" [loading]="apptsState.loading">
+        <ng-template #icon><svg lucideXCircle [size]="16" [strokeWidth]="2"></svg></ng-template>
+      </app-kpi-card>
+      <app-kpi-card title="No-Show Rate" [value]="noShowRateLabel()" [loading]="apptsState.loading">
+        <ng-template #icon><svg lucideUserX [size]="16" [strokeWidth]="2"></svg></ng-template>
+      </app-kpi-card>
+    </div>
+
+    <ejs-tab heightAdjustMode="Auto" [selectedItem]="selectedTabIndex()" (selecting)="onTabSelecting($event)">
+      <e-tabitems>
+        @for (header of tabHeaders; track header.text) {
+          <e-tabitem [header]="header"></e-tabitem>
+        }
+      </e-tabitems>
+    </ejs-tab>
+
+    <div class="tab-content">
+      @switch (activeTab()) {
+        @case ('schedule') {
+          <app-provider-schedule-tab
+            [appointments]="appointments()"
+            [loading]="apptsState.loading && !apptsState.data"
+            [error]="apptsState.error"
+            [onRetry]="retryAppointments"
+            [selectedDate]="today">
+          </app-provider-schedule-tab>
+        }
+        @case ('analytics') {
+          <app-provider-analytics-tab
+            [utilizationData]="utilizationData()"
+            [utilizationLoading]="utilizationState.loading && !utilizationState.data"
+            [utilizationError]="utilizationState.error"
+            [onUtilizationRetry]="retryUtilization"
+            [noShowData]="noShowData()"
+            [noShowLoading]="noShowState.loading && !noShowState.data"
+            [noShowError]="noShowState.error"
+            [onNoShowRetry]="retryNoShow"
+            [departmentName]="provider()?.departmentName ?? ''">
+          </app-provider-analytics-tab>
+        }
+      }
+    </div>
+  </div>
+}

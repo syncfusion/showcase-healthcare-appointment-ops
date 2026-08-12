@@ -1,0 +1,221 @@
+@use "./styles/variables" as *;
+@import "@syncfusion/ej2-base/styles/tailwind3.css";
+@import "@syncfusion/ej2-buttons/styles/tailwind3.css";
+@import "@syncfusion/ej2-calendars/styles/tailwind3.css";
+@import "@syncfusion/ej2-dropdowns/styles/tailwind3.css";
+@import "@syncfusion/ej2-grids/styles/tailwind3.css";
+@import "@syncfusion/ej2-inputs/styles/tailwind3.css";
+@import "@syncfusion/ej2-kanban/styles/tailwind3.css";
+@import "@syncfusion/ej2-layouts/styles/tailwind3.css";
+@import "@syncfusion/ej2-lists/styles/tailwind3.css";
+@import "@syncfusion/ej2-navigations/styles/tailwind3.css";
+@import "@syncfusion/ej2-pdfviewer/styles/tailwind3.css";
+@import "@syncfusion/ej2-notifications/styles/tailwind3.css";
+@import "@syncfusion/ej2-popups/styles/tailwind3.css";
+@import "@syncfusion/ej2-schedule/styles/tailwind3.css";
+@import "@syncfusion/ej2-interactive-chat/styles/tailwind3.css";
+@import "@syncfusion/ej2-splitbuttons/styles/tailwind3.css";
+@import "@syncfusion/ej2-documenteditor/styles/tailwind3.css";
+
+html, body, app-root {
+  height: 100%;
+  margin: 0;
+  font-family: var(--e-font-family);
+  background: var(--background);
+  color: var(--text-primary);
+}
+
+.e-grid .e-row:hover {
+  cursor: pointer;
+}
+
+.patient-grid .e-row:hover {
+  background: var(--color-sf-bg-secondary);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-sf-bg-tertiary) 25%,
+    var(--color-sf-bg-secondary-hover) 37%,
+    var(--color-sf-bg-tertiary) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+#app-sidebar {
+  background: var(--color-sf-bg-primary);
+  border-right: 1px solid var(--color-sf-border-secondary);
+}
+
+#app-sidebar.e-close .sidebar-logo-full {
+  display: none;
+}
+
+#app-sidebar.e-close .sidebar-logo {
+  justify-content: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+#app-sidebar.e-close .sidebar-label {
+  display: none;
+}
+
+#app-sidebar.e-close .sidebar-nav-link {
+  justify-content: center !important;
+  padding: 9px 0 !important;
+}
+
+.timeline-dot.timeline-dot-appointment {
+  background: var(--color-sf-bg-brand-solid);
+  border-color: var(--color-sf-bg-brand-solid);
+  color: var(--color-sf-fg-white);
+}
+
+.timeline-dot.timeline-dot-audit {
+  background: var(--color-sf-bg-tertiary);
+  border-color: var(--color-sf-border-secondary);
+  color: var(--color-sf-fg-tertiary);
+}
+
+.e-schedule .e-appointment {
+  border: none;
+  border-radius: var(--radius-6);
+  font-weight: 500;
+  text-shadow: none;
+}
+
+.e-schedule .e-appointment .e-subject,
+.e-schedule .e-appointment .e-time,
+.e-schedule .e-appointment .e-location,
+.e-schedule .e-appointment .e-date-time {
+  color: inherit !important;
+  opacity: 1 !important;
+}
+
+.e-schedule .e-appointment .e-time {
+  font-size: var(--font-size-xs);
+  opacity: 0.9 !important;
+}
+
+.e-schedule .e-appointment .e-subject {
+  font-size: var(--font-size-sm);
+}
+
+.e-schedule .e-month-view .e-appointment .e-subject {
+  font-size: var(--font-size-xs);
+}
+
+.e-schedule .e-appointment.e-appointment-border,
+.e-schedule .e-appointment:focus,
+.e-schedule .e-appointment.e-selected {
+  outline: 2px solid var(--color-sf-fg-primary);
+  outline-offset: -2px;
+}
+
+.waitlist-kanban.e-kanban {
+  display: flex;
+  flex-direction: column;
+}
+
+.waitlist-kanban .e-kanban-content {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.waitlist-ai .e-banner-view {
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+  overflow: auto;
+  padding: 12px;
+}
+
+.dashboard-upcoming-list.e-listview,
+.dashboard-upcoming-list .e-list-parent {
+  background: transparent;
+  border: none;
+}
+
+.dashboard-upcoming-list.e-listview .e-list-item,
+.dashboard-upcoming-list.e-listview .e-list-item .e-text-content,
+.dashboard-upcoming-list.e-listview .e-list-item .e-list-text {
+  height: auto !important;
+  min-height: 0 !important;
+  line-height: normal !important;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  display: block;
+  width: 100%;
+}
+
+.dashboard-upcoming-list.e-listview .e-list-item {
+  padding: 14px 20px;
+  border: none;
+  border-bottom: 1px solid var(--color-sf-border-tertiary);
+  color: inherit;
+}
+
+.dashboard-upcoming-list.e-listview .e-list-item:last-child {
+  border-bottom: none;
+}
+
+.dashboard-upcoming-list.e-listview .e-list-item.e-hover,
+.dashboard-upcoming-list.e-listview .e-list-item:hover,
+.dashboard-upcoming-list.e-listview .e-list-item.e-active,
+.dashboard-upcoming-list.e-listview .e-list-item.e-focused {
+  background: var(--color-sf-bg-primary-hover);
+  color: inherit;
+}
+
+.kpi-card {
+  transition: box-shadow 0.2s ease;
+}
+
+.kpi-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-sf-border-primary);
+}
+
+.e-schedule .e-vertical-view .e-content-wrap table,
+.e-schedule .e-vertical-view .e-time-cells-wrap table {
+  height: 100%;
+}
+
+/* Keep .e-small buttons at a usable minimum height so tight inline padding
+   in grid cells (e.g. Patient/Medications tab actions) can't collapse them
+   below 32px. Picked up by all action-column View/Check-In/No-Show/Cancel/
+   Request-Refill buttons across PatientList/ProviderList/PatientDetail grids. */
+.e-btn.e-small,
+button.e-btn.e-small {
+  min-height: 32px;
+}
+
+.e-popup.dept-group-ddl .e-list-group-item,
+.dept-group-ddl.e-popup .e-list-group-item {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-sf-bg-secondary);
+  color: var(--color-sf-fg-secondary);
+  border-bottom: 1px solid var(--color-sf-border-secondary);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
+  padding: var(--spacing-8) var(--spacing-12);
+}

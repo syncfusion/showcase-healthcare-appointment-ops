@@ -1,0 +1,606 @@
+@page "/reports"
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.Calendars
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Buttons
+@inject AnalyticsService AnalyticsService
+@inject ReferenceDataService ReferenceDataService
+@inject ThemeService ThemeService
+@implements IDisposable
+
+<PageTitle>Reports | Healthcare Appointment and Patient Operations Portal</PageTitle>
+
+<div class="reports-page">
+    @if (HasError)
+    {
+        <ErrorBanner Title="Failed to load analytics data" Message="@AggregateError" OnRetry="ReloadAllAsync" />
+    }
+
+    <div class="reports-grid">
+        <div class="reports-card reports-filters">
+            <div class="reports-filter-field reports-filter-range">
+                <label class="reports-filter-label">Date Range</label>
+                <SfDateRangePicker TValue="DateTime?"
+                                   Placeholder="Select a date range"
+                                   Locale="en-US"
+                                   @bind-StartDate="_startDate"
+                                   @bind-StartDate:after="ReloadIfReadyAsync"
+                                   @bind-EndDate="_endDate"
+                                   @bind-EndDate:after="ReloadIfReadyAsync"
+                                   Format="MMM d, yyyy"
+                                   Width="280px"
+                                   ShowClearButton="true">
+                    <DateRangePickerPresets>
+                        <DateRangePickerPreset  Label="Last 7 days" Start="@_last7Start" End="@_today" />
+                        <DateRangePickerPreset  Label="Last 30 days" Start="@_last30Start" End="@_today" />
+                        <DateRangePickerPreset Label="MTD" Start="@_monthStart" End="@_today" />
+                        <DateRangePickerPreset Label="QTD" Start="@_quarterStart" End="@_today" />
+                        <DateRangePickerPreset Label="This Month" Start="@_monthStart" End="@_today" />
+                        <DateRangePickerPreset Label="Last Month" Start="@_prevMonthStart" End="@_prevMonthEnd" />
+                        <DateRangePickerPreset Label="Last Quarter" Start="@_prevQuarterStart" End="@_prevQuarterEnd" />
+                    </DateRangePickerPresets>
+                </SfDateRangePicker>
+            </div>
+            <div class="reports-filter-field reports-filter-dept">
+                <label class="reports-filter-label">Department</label>
+                <SfDropDownList TValue="string"
+                                TItem="DepartmentOption"
+                                @key="@($"dept-ddl-{_departmentOptions.Count}")"
+                                Placeholder="All Departments"
+                                DataSource="@_departmentOptions"
+                                Width="100%"
+                                PopupHeight="280px"
+                                @bind-Value="_departmentFilter"
+                                @bind-Value:after="ReloadIfReadyAsync"
+                                AllowFiltering="true"
+                                SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending"
+                                ShowClearButton="true">
+                    <DropDownListFieldSettings Text="DepartmentName" Value="DepartmentId" GroupBy="LocationName" />
+                </SfDropDownList>
+            </div>
+            <SfButton CssClass="e-outline" OnClick="ResetFilters">Reset</SfButton>
+        </div>
+
+        @if (!FiltersReady)
+        {
+            <div class="reports-card reports-card-span-4">
+                <EmptyState Title="Select filters"
+                            Description="Choose a start date, end date, and department to view the analytics reports. Use Reset to clear your selection." />
+            </div>
+        }
+        else
+        {
+
+            <div class="reports-card reports-card-span-2">
+                <div class="reports-card-title">Appointment Volume Trend</div>
+                @if (_loadingVolume)
+                {
+                    <LoadingState Inline="true" Label="Loading volume…" />
+                }
+                else if (VolumeData.Count == 0)
+                {
+                    <EmptyState Title="No volume data" Description="No appointments in this range." />
+                }
+                else
+                {
+                    <div class="reports-chart-fill" style="height: @ReportsChartHeight; min-height: 260px;">
+                        <SfChart @key="@(_reloadTick + "-" + ChartThemeKey)" Height="100%" Background="transparent" Theme="@ChartThemeValue">
+                            <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" Title="Period"></ChartPrimaryXAxis>
+                            <ChartPrimaryYAxis Title="Count"></ChartPrimaryYAxis>
+                            <ChartLegendSettings Visible="true" />
+                            <ChartTooltipSettings Enable="true" />
+                            <ChartSeriesCollection>
+                                @foreach (var s in AppointmentTypeSeries)
+                                {
+                                    <ChartSeries DataSource="VolumeData"
+                                                 XName="Period"
+                                                 YName="@s.PropertyName"
+                                                 Name="@s.Label"
+                                                 Type="ChartSeriesType.Line"
+                                                 Fill="@s.Color"
+                                                 Width="2">
+                                        <ChartMarker Visible="true" Width="7" Height="7" Fill="@s.Color"></ChartMarker>
+                                    </ChartSeries>
+                                }
+                            </ChartSeriesCollection>
+                        </SfChart>
+                    </div>
+                }
+            </div>
+
+            <div class="reports-card reports-card-span-2">
+                <div class="reports-card-title">No-Show Rate Trend</div>
+                @if (_loadingNoShow)
+                {
+                    <LoadingState Inline="true" Label="Loading no-show trend…" />
+                }
+                else if (NoShowData.Count == 0)
+                {
+                    <EmptyState Title="No no-show data" Description="No appointments in this range." />
+                }
+                else
+                {
+                    <div class="reports-chart-fill" style="height: @ReportsChartHeight; min-height: 260px;">
+                        <SfChart @key="@(_reloadTick + "-" + ChartThemeKey)" Height="100%" Background="transparent" Theme="@ChartThemeValue">
+                            <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" Title="Period"></ChartPrimaryXAxis>
+                            <ChartPrimaryYAxis Title="No-Show %" LabelFormat="{value}%" Maximum="@NoShowMax" Interval="@NoShowInterval"></ChartPrimaryYAxis>
+                            <ChartLegendSettings Visible="false" />
+                            <ChartTooltipSettings Enable="true" />
+                            <ChartSeriesCollection>
+                                <ChartSeries DataSource="NoShowData"
+                                             XName="Period"
+                                             YName="Rate"
+                                             Name="No-Show %"
+                                             Type="ChartSeriesType.StepLine"
+                                             Fill="@SeriesRose"
+                                             Width="2.5">
+                                    <ChartMarker Visible="true" Width="7" Height="7" Fill="@SeriesRose" Shape="ChartShape.Circle"></ChartMarker>
+                                </ChartSeries>
+                            </ChartSeriesCollection>
+                        </SfChart>
+                    </div>
+                }
+            </div>
+
+            <div class="reports-card reports-card-span-2">
+                <div class="reports-card-title">@($"Provider Utilization (% vs {UtilizationTarget}% goal)")</div>
+                @if (_loadingUtilization)
+                {
+                    <LoadingState Inline="true" Label="Loading utilization…" />
+                }
+                else if (UtilizationData.Count == 0)
+                {
+                    <EmptyState Title="No utilization data" Description="No providers in this range." />
+                }
+                else
+                {
+                    <div class="reports-chart-fill reports-chart-fill-tall" style="height: @ReportsBulletHeight; min-height: 260px;">
+                        <SfBulletChart @key="@($"util-{_departmentFilter}-{UtilizationData.Count}-{ReportsBulletHeightPx}")"
+                                       ID="provider-utilization"
+                                       Theme="@ChartThemeValue"
+                                       DataSource="UtilizationData"
+                                       ValueField="UtilizationRate"
+                                       TargetField="Target"
+                                       CategoryField="Category"
+                                       ValueFill="#0D9488"
+                                       ValueHeight="18"
+                                       TargetTypes="@BulletTargetTypes"
+                                       TargetWidth="5"
+                                       TargetColor="var(--color-sf-fg-primary)"
+                                       Minimum="0"
+                                       Maximum="100"
+                                       Interval="20"
+                                       Height="100%"
+                                       LabelFormat="{value}%">
+                            <BulletChartMargin Left="110" Right="40" Top="16" Bottom="16"></BulletChartMargin>
+                            <BulletChartCategoryLabelStyle Size="12px" FontWeight="600" Color="var(--color-sf-fg-primary)"></BulletChartCategoryLabelStyle>
+                            <BulletChartDataLabel>
+                                <BulletChartDataLabelStyle Size="11px" FontWeight="600" Color="var(--color-sf-fg-secondary)"></BulletChartDataLabelStyle>
+                            </BulletChartDataLabel>
+                            <BulletChartTooltip TValue="UtilizationRow" Enable="true"></BulletChartTooltip>
+                            <BulletChartRangeCollection>
+                                <BulletChartRange End="70" Color="var(--color-sf-error-100)" Opacity="0.6"></BulletChartRange>
+                                <BulletChartRange End="85" Color="var(--color-sf-warning-100)" Opacity="0.6"></BulletChartRange>
+                                <BulletChartRange End="100" Color="var(--color-sf-success-100)" Opacity="0.6"></BulletChartRange>
+                            </BulletChartRangeCollection>
+                        </SfBulletChart>
+                    </div>
+                }
+            </div>
+
+            <div class="reports-card reports-card-span-2">
+                <div class="reports-card-title">Cancellation Reasons</div>
+                @if (_loadingCancellation)
+                {
+                    <LoadingState Inline="true" Label="Loading cancellation reasons…" />
+                }
+                else if (CancellationData.Count == 0)
+                {
+                    <EmptyState Title="No cancellations" Description="No cancellations in this range." />
+                }
+                else
+                {
+                    <div class="reports-chart-fill" style="height: @ReportsChartHeight; min-height: 260px;">
+                        <SfAccumulationChart @key="@(_reloadTick + "-" + ChartThemeKey)" Height="100%" Background="transparent" Theme="@ChartThemeValue">
+                            <AccumulationChartLegendSettings Visible="true" Position="LegendPosition.Bottom" />
+                            <AccumulationChartTooltipSettings Enable="true"></AccumulationChartTooltipSettings>
+                            <AccumulationChartCenterLabel Text="@TotalCancellations.ToString()"></AccumulationChartCenterLabel>
+                            <AccumulationChartSeriesCollection>
+                                <AccumulationChartSeries DataSource="CancellationData"
+                                                         XName="Reason"
+                                                         YName="Count"
+                                                         Name="Cancellations"
+                                                         Type="AccumulationType.Pie"
+                                                         InnerRadius="60%"
+                                                         StartAngle="0"
+                                                         EndAngle="360"
+                                                         Explode="true"
+                                                         ExplodeOffset="8px"
+                                                         PointColorMapping="Color">
+                                    <AccumulationDataLabelSettings Visible="true" Name="Reason" Position="AccumulationLabelPosition.Outside"></AccumulationDataLabelSettings>
+                                </AccumulationChartSeries>
+                            </AccumulationChartSeriesCollection>
+                        </SfAccumulationChart>
+                    </div>
+                }
+            </div>
+
+        }
+    </div>
+</div>
+
+@code {
+    private const int UtilizationTarget = 85;
+
+    private static readonly List<Syncfusion.Blazor.Charts.TargetType> BulletTargetTypes =
+        new() { Syncfusion.Blazor.Charts.TargetType.Rect };
+
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+    private string _departmentFilter = string.Empty;
+    private List<DepartmentOption> _departmentOptions = new();
+
+    private DateTime _today = DateTime.Today;
+    private DateTime _last7Start => _today.AddDays(-6);
+    private DateTime _last30Start => _today.AddDays(-29);
+    private DateTime _monthStart => new DateTime(_today.Year, _today.Month, 1);
+    private DateTime _quarterStart => new DateTime(_today.Year, (int)Math.Floor((_today.Month - 1) / 3.0) * 3 + 1, 1);
+    private DateTime _prevMonthStart => _monthStart.AddMonths(-1);
+    private DateTime _prevMonthEnd => _monthStart.AddDays(-1);
+    private DateTime _prevQuarterStart => _quarterStart.AddMonths(-3);
+    private DateTime _prevQuarterEnd => _quarterStart.AddDays(-1);
+
+    private bool _loadingVolume;
+    private bool _loadingNoShow;
+    private bool _loadingUtilization;
+    private bool _loadingCancellation;
+
+    private string? _volumeError;
+    private string? _noShowError;
+    private string? _utilizationError;
+    private string? _cancellationError;
+
+    private List<VolumeRow> VolumeData { get; set; } = new();
+    private List<NoShowRow> NoShowData { get; set; } = new();
+    private List<UtilizationRow> UtilizationData { get; set; } = new();
+    private List<CancellationRow> CancellationData { get; set; } = new();
+
+    private int _reloadTick;
+
+    private static readonly string SeriesRose = ChartPalette.SeriesRose;
+
+    private static readonly ChartPalette.AppointmentTypeSeriesItem[] AppointmentTypeSeries =
+        ChartPalette.AppointmentTypeSeries;
+
+    private bool FiltersReady => _startDate.HasValue && _endDate.HasValue && !string.IsNullOrEmpty(_departmentFilter);
+    private bool HasError => !string.IsNullOrEmpty(AggregateError);
+    private string AggregateError => _volumeError ?? _noShowError ?? _utilizationError ?? _cancellationError ?? string.Empty;
+
+    private double NoShowMax => NiceAxisMax(NoShowData.Select(d => d.Rate));
+    private double NoShowInterval => NoShowMax / 5;
+
+    private double UtilizationMax => NiceAxisMax(UtilizationData.Select(d => d.UtilizationRate));
+    private double UtilizationInterval => UtilizationMax / 5;
+
+    private Syncfusion.Blazor.Theme ChartThemeValue => ChartTheme.Resolve(ThemeService.Resolved);
+    private string ChartThemeKey => ChartTheme.KeyFor(ThemeService.Resolved);
+
+    protected override async Task OnInitializedAsync()
+    {
+        ThemeService.OnChange += OnThemeChanged;
+
+        // Default to last quarter (mirrors the React initial date range).
+        _startDate = _prevQuarterStart;
+        _endDate = _prevQuarterEnd;
+
+        await LoadDepartmentsAsync();
+        await TryAutoSelectFirstDepartmentAsync();
+        if (FiltersReady)
+            await ReloadAllAsync();
+    }
+
+    private bool _autoSelectAttempted;
+    private async Task TryAutoSelectFirstDepartmentAsync()
+    {
+        if (_autoSelectAttempted) return;
+        _autoSelectAttempted = true;
+        // Wait until departments are loaded (the dropdown is populated after the first call).
+        for (var i = 0; i < 20 && _departmentOptions.Count == 0; i++)
+        {
+            await Task.Delay(50);
+        }
+        var first = _departmentOptions.FirstOrDefault();
+        if (first is not null && string.IsNullOrEmpty(_departmentFilter))
+        {
+            _departmentFilter = first.DepartmentId;
+        }
+    }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => ThemeService.OnChange -= OnThemeChanged;
+
+    private async Task LoadDepartmentsAsync()
+    {
+        try
+        {
+            var result = await ReferenceDataService.GetDepartmentsAsync();
+            if (result.IsOk && result.Data is not null)
+            {
+                _departmentOptions = result.Data.Select(d => new DepartmentOption
+                {
+                    DepartmentId = d.DepartmentId,
+                    DepartmentName = d.DepartmentName,
+                    LocationName = d.LocationName,
+                    DisplayLabel = $"{d.DepartmentName} — {d.LocationName}",
+                }).ToList();
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task ReloadIfReadyAsync()
+    {
+        if (FiltersReady)
+            await ReloadAllAsync();
+    }
+
+    private void ResetFilters()
+    {
+        _startDate = null;
+        _endDate = null;
+        _departmentFilter = string.Empty;
+        VolumeData = new();
+        NoShowData = new();
+        UtilizationData = new();
+        CancellationData = new();
+    }
+
+    private int TotalCancellations => CancellationData.Sum(d => d.Count);
+
+    private string ReportsChartHeight
+        => "clamp(260px, calc((100vh - 300px) / 2), 720px)";
+
+    private string ReportsBulletHeight
+        => "clamp(260px, calc((100vh - 300px) / 2), 720px)";
+
+    private int ReportsBulletHeightPx => 320;
+
+    private async Task ReloadAllAsync()
+    {
+        await Task.WhenAll(
+            LoadVolumeAsync(),
+            LoadNoShowAsync(),
+            LoadUtilizationAsync(),
+            LoadCancellationAsync());
+        _reloadTick++;
+        StateHasChanged();
+    }
+
+    private static DateTime PeriodSortKey(string period)
+        => DateTime.TryParse(period, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var dt) ? dt : DateTime.MaxValue;
+
+    private (string Start, string End) RangeStrings()
+        => (_startDate!.Value.ToString("yyyy-MM-dd"), _endDate!.Value.ToString("yyyy-MM-dd"));
+
+    private async Task LoadVolumeAsync()
+    {
+        _loadingVolume = true;
+        _volumeError = null;
+        try
+        {
+            var (start, end) = RangeStrings();
+            var result = await AnalyticsService.GetAppointmentVolumeAsync(start, end);
+            if (result.IsOk)
+            {
+                var rows = result.Data ?? new List<VolumeDataPointDto>();
+                var grouped = new Dictionary<string, VolumeRow>(StringComparer.OrdinalIgnoreCase);
+                foreach (var d in rows)
+                {
+                    if (!string.IsNullOrEmpty(_departmentFilter) &&
+                        !string.Equals(d.DepartmentId, _departmentFilter, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (!grouped.TryGetValue(d.Period, out var row))
+                    {
+                        row = new VolumeRow { Period = d.Period };
+                        grouped[d.Period] = row;
+                    }
+                    row.Add(d.AppointmentType, d.Count);
+                }
+                VolumeData = grouped.Values.OrderBy(d => PeriodSortKey(d.Period)).ToList();
+            }
+            else
+            {
+                _volumeError = result.Error?.Title ?? "Failed to load appointment volume.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _volumeError = ex.Message;
+        }
+        _loadingVolume = false;
+    }
+
+    private async Task LoadNoShowAsync()
+    {
+        _loadingNoShow = true;
+        _noShowError = null;
+        try
+        {
+            var (start, end) = RangeStrings();
+            var result = await AnalyticsService.GetNoShowTrendsAsync(start, end, _departmentFilter);
+            if (result.IsOk)
+            {
+                NoShowData = (result.Data ?? new List<NoShowTrendDto>())
+                    .Select(d => new NoShowRow { Period = d.Period, Rate = double.IsFinite(d.NoShowRate) ? d.NoShowRate * 100 : 0 })
+                    .OrderBy(d => PeriodSortKey(d.Period))
+                    .ToList();
+            }
+            else
+            {
+                _noShowError = result.Error?.Title ?? "Failed to load no-show trends.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _noShowError = ex.Message;
+        }
+        _loadingNoShow = false;
+    }
+
+    private async Task LoadUtilizationAsync()
+    {
+        _loadingUtilization = true;
+        _utilizationError = null;
+        try
+        {
+            var (start, end) = RangeStrings();
+            var result = await AnalyticsService.GetProviderUtilizationAsync(start, end, null, _departmentFilter);
+            if (result.IsOk)
+            {
+                var byProvider = new Dictionary<string, UtilizationRow>(StringComparer.OrdinalIgnoreCase);
+                foreach (var d in result.Data ?? new List<UtilizationDataPointDto>())
+                {
+                    if (!byProvider.TryGetValue(d.ProviderId, out var row))
+                    {
+                        row = new UtilizationRow { ProviderName = d.ProviderName };
+                        byProvider[d.ProviderId] = row;
+                    }
+                    row.Appointments += d.AppointmentCount;
+                    row.Slots += d.TotalSlots;
+                }
+                UtilizationData = byProvider.Values
+                    .Select(p => new UtilizationRow
+                    {
+                        Category = p.ProviderName.Split(',')[0].Trim(),
+                        UtilizationRate = p.Slots > 0 ? Math.Round(100.0 * p.Appointments / p.Slots) : 0,
+                    })
+                    .OrderByDescending(p => p.UtilizationRate)
+                    .Select((p, i) => new UtilizationRow
+                    {
+                        Category = p.Category,
+                        UtilizationRate = p.UtilizationRate,
+                        Target = UtilizationTarget,
+                        Color = ChartPalette.CategoryRamp[i % ChartPalette.CategoryRamp.Length],
+                    })
+                    .ToList();
+            }
+            else
+            {
+                _utilizationError = result.Error?.Title ?? "Failed to load provider utilization.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _utilizationError = ex.Message;
+        }
+        _loadingUtilization = false;
+    }
+
+    private async Task LoadCancellationAsync()
+    {
+        _loadingCancellation = true;
+        _cancellationError = null;
+        try
+        {
+            var (start, end) = RangeStrings();
+            var result = await AnalyticsService.GetCancellationReasonsAsync(start, end, _departmentFilter);
+            if (result.IsOk)
+            {
+                CancellationData = (result.Data ?? new List<CancellationReasonDto>())
+                    .Select((d, i) => new CancellationRow
+                    {
+                        Reason = d.Reason,
+                        Count = d.Count,
+                        Color = ChartPalette.CategoryRamp[i % ChartPalette.CategoryRamp.Length],
+                    })
+                    .ToList();
+            }
+            else
+            {
+                _cancellationError = result.Error?.Title ?? "Failed to load cancellation reasons.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _cancellationError = ex.Message;
+        }
+        _loadingCancellation = false;
+    }
+
+    private static double NiceAxisMax(IEnumerable<double> values)
+    {
+        var max = Math.Max(0, values.DefaultIfEmpty(0).Max());
+        if (max <= 0) return 10;
+        var padded = max * 1.02;
+        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(padded)));
+        var norm = padded / magnitude;
+        var nice = new[] { 1.0, 2.0, 2.5, 5.0, 10.0 }.FirstOrDefault(s => s >= norm);
+        if (nice == 0) nice = 10;
+        return nice * magnitude;
+    }
+
+    private class DepartmentOption
+    {
+        public string DepartmentId { get; set; } = string.Empty;
+        public string DepartmentName { get; set; } = string.Empty;
+        public string LocationName { get; set; } = string.Empty;
+        public string DisplayLabel { get; set; } = string.Empty;
+    }
+
+    private class VolumeRow
+    {
+        public string Period { get; set; } = string.Empty;
+        public double NewPatient { get; set; }
+        public double FollowUp { get; set; }
+        public double AnnualPhysical { get; set; }
+        public double UrgentCare { get; set; }
+        public double Consultation { get; set; }
+        public double Procedure { get; set; }
+        public double LabReview { get; set; }
+        public double Telehealth { get; set; }
+
+        public void Add(string appointmentType, double count)
+        {
+            switch (appointmentType)
+            {
+                case "New Patient": NewPatient += count; break;
+                case "Follow-Up": FollowUp += count; break;
+                case "Annual Physical": AnnualPhysical += count; break;
+                case "Urgent Care": UrgentCare += count; break;
+                case "Consultation": Consultation += count; break;
+                case "Procedure": Procedure += count; break;
+                case "Lab Review": LabReview += count; break;
+                case "Telehealth": Telehealth += count; break;
+            }
+        }
+    }
+
+    private class NoShowRow
+    {
+        public string Period { get; set; } = string.Empty;
+        public double Rate { get; set; }
+    }
+
+    private class UtilizationRow
+    {
+        public string ProviderName { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public double UtilizationRate { get; set; }
+        public double Target { get; set; }
+        public int Appointments { get; set; }
+        public int Slots { get; set; }
+        public string Color { get; set; } = string.Empty;
+    }
+
+    private class CancellationRow
+    {
+        public string Reason { get; set; } = string.Empty;
+        public int Count { get; set; }
+        public string Color { get; set; } = string.Empty;
+    }
+}

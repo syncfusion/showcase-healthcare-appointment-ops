@@ -1,0 +1,119 @@
+.panel-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.panel-scroll {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: auto;
+}
+
+.panel-close-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px 0;
+}
+
+.panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  overflow: auto;
+}
+
+.panel-pad {
+  padding: 16px;
+}
+
+.panel-empty {
+  padding: 24px;
+  color: var(--color-sf-fg-tertiary);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.field {
+  .field-label {
+    font-weight: 600;
+    font-size: 13px;
+    display: block;
+    margin-bottom: 4px;
+  }
+}
+
+.card-section {
+  border: 1px solid var(--color-sf-border-secondary);
+  border-radius: var(--radius-6);
+  padding: 12px;
+  background: var(--color-sf-bg-secondary);
+}
+
+.section-title {
+  font-weight: 700;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.row {
+  display: flex;
+  font-size: 12px;
+  margin-bottom: 4px;
+
+  .row-label {
+    width: 140px;
+    color: var(--color-sf-fg-tertiary);
+  }
+
+  .row-value {
+    flex: 1;
+    font-weight: 500;
+  }
+}
+
+.audit-empty {
+  font-size: 12px;
+  color: var(--color-sf-fg-tertiary);
+}
+
+.audit-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  li {
+    font-size: 12px;
+    line-height: 1.4;
+
+    .audit-action {
+      font-weight: 600;
+    }
+
+    .audit-meta {
+      color: var(--color-sf-fg-tertiary);
+    }
+  }
+}
+
+.dialog-text {
+  font-size: 13px;
+}
+
+:host ::ng-deep .e-sidebar.e-right {
+  background: var(--color-sf-bg-primary);
+}

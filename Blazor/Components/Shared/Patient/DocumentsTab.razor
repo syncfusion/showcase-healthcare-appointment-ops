@@ -1,0 +1,190 @@
+@using Syncfusion.Blazor.Grids
+@inject PatientService PatientService
+@inject AiService AiService
+@inject HttpClient Http
+
+@if (_loading)
+{
+    <LoadingState Inline="true" Label="Loading documents…" />
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <ErrorBanner Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_documents.Count == 0)
+{
+    <EmptyState Title="No documents" Description="No documents on file for this patient." />
+}
+else
+{
+    <div class="documents-layout">
+        <div>
+            <SfGrid DataSource="_documents" TValue="DocumentDto" Width="100%" AllowPaging="true" AllowSorting="true" AllowSelection="true">
+                <GridPageSettings PageSize="8" />
+                <GridEvents TValue="DocumentDto" RowSelected="OnRowSelected" />
+                <GridColumns>
+                    <GridColumn Field="@nameof(DocumentDto.Name)" HeaderText="Document" Width="140" />
+                    <GridColumn Field="@nameof(DocumentDto.UploadedDate)" HeaderText="Uploaded" Width="100">
+                        <Template>@FormatDate(((DocumentDto)context).UploadedDate)</Template>
+                    </GridColumn>
+                    <GridColumn Field="@nameof(DocumentDto.Status)" HeaderText="Status" Width="90">
+                        <Template><StatusBadge Status="@(((DocumentDto)context).Status)" /></Template>
+                    </GridColumn>
+                </GridColumns>
+            </SfGrid>
+        </div>
+
+        <div class="doc-viewer-shell">
+            @if (_selected is null)
+            {
+                <EmptyState Title="Select a document"
+                            Description="Choose a row on the left to preview the PDF and demonstrate search, annotation, bookmark, and thumbnail navigation." />
+            }
+            else
+            {
+                <div class="doc-viewer-header">
+                    <div>
+                        <div class="doc-viewer-name">@_selected.Name</div>
+                        <div class="doc-viewer-meta">
+                            @_selected.ProviderName • @FormatDate(_selected.UploadedDate) • @_selected.PageCount page(s) • @((_selected.SizeBytes / 1024).ToString("F0")) KB
+                        </div>
+                    </div>
+                    @if (_selected.Type == "Lab Report")
+                    {
+                        <SfButton CssClass="e-primary" Disabled="_aiLoading" OnClick="@(args => SummarizeAsync())">✨ Summarize</SfButton>
+                    }
+                </div>
+                <div class="doc-viewer-frame">
+                    @if (_loadingPdf)
+                    {
+                        <LoadingState Inline="true" Label="Loading document…" />
+                    }
+                    else if (!string.IsNullOrEmpty(_pdfError))
+                    {
+                        <ErrorBanner Message="@_pdfError" />
+                    }
+                    else if (!string.IsNullOrEmpty(_documentPath))
+                    {
+                        <div @key="_selected.DocumentId">
+                            <SfPdfViewer2 DocumentPath="@_documentPath" Height="max(480px, calc(100vh - 320px))" Width="100%" />
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <AiAssistSidebar @bind-IsOpen="_sidebarOpen"
+                     Title="Lab Report AI Summary"
+                     Loading="_aiLoading"
+                     Error="@_aiError"
+                     Summary="@_aiResult?.Summary"
+                     Explanation="@_aiResult?.Explanation"
+                     Confidence="@(_aiResult?.Confidence)"
+                     Recommendations="_aiRecommendations" />
+}
+
+@code {
+    [Parameter] public string PatientId { get; set; } = string.Empty;
+
+    private List<DocumentDto> _documents = new();
+    private DocumentDto? _selected;
+    private bool _loading = true;
+    private string? _error;
+    private string? _documentPath;
+    private bool _loadingPdf;
+    private string? _pdfError;
+
+    private bool _sidebarOpen;
+    private bool _aiLoading;
+    private string? _aiError;
+    private LabSummaryResultDto? _aiResult;
+    private List<AiAssistSidebar.AiRecommendationModel> _aiRecommendations = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var result = await PatientService.GetPatientDocumentsAsync(PatientId);
+            if (result.IsOk)
+                _documents = result.Data ?? new();
+            else
+                _error = result.Error?.Title ?? "Failed to load documents.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        _loading = false;
+    }
+
+    private async Task OnRowSelected(RowSelectEventArgs<DocumentDto> args)
+    {
+        _selected = args.Data;
+        _documentPath = null;
+        _pdfError = null;
+        if (_selected is null) return;
+
+        _loadingPdf = true;
+        StateHasChanged();
+        try
+        {
+            var url = $"api/v1/patients/{PatientId}/documents/{_selected.DocumentId}/pdf";
+            var bytes = await Http.GetByteArrayAsync(url);
+            _documentPath = "data:application/pdf;base64," + Convert.ToBase64String(bytes);
+        }
+        catch (Exception ex)
+        {
+            _pdfError = $"Failed to load the PDF: {ex.Message}";
+        }
+        _loadingPdf = false;
+        StateHasChanged();
+    }
+
+    private async Task SummarizeAsync()
+    {
+        if (_selected is null) return;
+        _aiLoading = true;
+        _aiError = null;
+        _aiResult = null;
+        _aiRecommendations = new();
+        _sidebarOpen = true;
+        StateHasChanged();
+        try
+        {
+            var result = await AiService.SummarizeDocumentAsync(PatientId, _selected.DocumentId);
+            if (result.IsOk && result.Data is not null)
+            {
+                _aiResult = result.Data;
+                _aiRecommendations = result.Data.Recommendations
+                    .Select((r, i) => new AiAssistSidebar.AiRecommendationModel
+                    {
+                        Id = $"{_selected.DocumentId}-{i}",
+                        Title = r.Title,
+                        Rationale = r.Rationale,
+                        Severity = r.Severity is "Critical" or "Warning" ? r.Severity : "Info"
+                    })
+                    .ToList();
+            }
+            else
+            {
+                _aiError = result.Error?.Detail ?? "AI summarization failed.";
+            }
+        }
+        catch
+        {
+            _aiError = "Failed to reach the AI service.";
+        }
+        _aiLoading = false;
+    }
+
+    private static string FormatDate(string iso) =>
+        DateFormats.FormatDate(iso);
+}

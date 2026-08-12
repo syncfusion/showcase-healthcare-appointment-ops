@@ -1,0 +1,29 @@
+@using Syncfusion.Blazor.Buttons
+
+@if (Visible)
+{
+    <div class="error-banner" role="alert">
+        <div class="error-banner-title">@Title</div>
+        <div class="error-banner-message">@Message</div>
+        @if (OnRetry.HasDelegate)
+        {
+            <div class="error-banner-actions">
+                <SfButton CssClass="e-danger e-outline" OnClick="RetryAsync">@RetryLabel</SfButton>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "Something went wrong";
+    [Parameter] public string Message { get; set; } = string.Empty;
+    [Parameter] public string RetryLabel { get; set; } = "Retry";
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public bool Visible { get; set; } = true;
+
+    private async Task RetryAsync()
+    {
+        if (OnRetry.HasDelegate)
+            await OnRetry.InvokeAsync();
+    }
+}

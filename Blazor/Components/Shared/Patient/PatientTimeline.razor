@@ -1,0 +1,103 @@
+
+@if (Entries.Count == 0)
+{
+    <div style="font-size: 13px; color: var(--color-sf-fg-tertiary);">No recent activity.</div>
+}
+else
+{
+    <SfTimeline Alignment="TimelineAlignment.After" CssClass="health-ops-timeline">
+        <TimelineItems>
+            @foreach (var entry in Entries)
+            {
+                <TimelineItem DotCss="@(entry.Kind == "appointment" ? "timeline-dot-appointment" : "timeline-dot-audit")">
+                    <OppositeContent>
+                        <span class="timeline-item-date">@entry.DateLabel</span>
+                    </OppositeContent>
+                    <Content>
+                        <div class="timeline-item-body">
+                            <div class="timeline-item-title-row">
+                                <span class="timeline-item-title">@entry.Title</span>
+                                @if (!string.IsNullOrEmpty(entry.Status))
+                                {
+                                    <StatusBadge Status="@entry.Status" />
+                                }
+                            </div>
+                            @if (!string.IsNullOrEmpty(entry.Subtitle))
+                            {
+                                <span class="timeline-item-subtitle">@entry.Subtitle</span>
+                            }
+                        </div>
+                    </Content>
+                </TimelineItem>
+            }
+        </TimelineItems>
+    </SfTimeline>
+    @if (OnViewAudit.HasDelegate)
+    {
+        <button class="timeline-view-audit" @onclick="OnViewAudit">View Audit Log →</button>
+    }
+}
+
+@code {
+    [Parameter] public List<AppointmentSummaryDto> Appointments { get; set; } = new();
+    [Parameter] public List<AuditLogDto> AuditEntries { get; set; } = new();
+    [Parameter] public EventCallback OnViewAudit { get; set; }
+
+    private const int MaxItems = 10;
+
+    private static readonly DateTime Now = DateTime.Now;
+
+    private List<TimelineEntry> Entries
+    {
+        get
+        {
+            var entries = new List<TimelineEntry>();
+
+            foreach (var a in Appointments)
+            {
+                if (!DateTime.TryParse(a.ScheduledDateTime, out var dt)) continue;
+                if (dt > Now) continue;
+                entries.Add(new TimelineEntry
+                {
+                    Date = dt,
+                    DateLabel = Fmt(dt),
+                    Kind = "appointment",
+                    Title = a.AppointmentType,
+                    Subtitle = string.IsNullOrEmpty(a.ProviderName) ? string.Empty : $"with {a.ProviderName}",
+                    Status = a.Status.ToString()
+                });
+            }
+
+            foreach (var e in AuditEntries)
+            {
+                if (!DateTime.TryParse(e.PerformedAt, out var dt)) continue;
+                if (dt > Now) continue;
+                entries.Add(new TimelineEntry
+                {
+                    Date = dt,
+                    DateLabel = Fmt(dt),
+                    Kind = "audit",
+                    Title = e.Action,
+                    Subtitle = string.IsNullOrEmpty(e.PerformedBy) ? string.Empty : $"by {e.PerformedBy}"
+                });
+            }
+
+            return entries.Where(e => e.Date <= Now)
+                .OrderByDescending(e => e.Date)
+                .Take(MaxItems)
+                .ToList();
+        }
+    }
+
+    private static string Fmt(DateTime dt) => DateFormats.FormatDateTime(dt);
+
+    private class TimelineEntry
+    {
+        public DateTime Date { get; set; }
+        public string DateLabel { get; set; } = string.Empty;
+        public string Kind { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Subtitle { get; set; } = string.Empty;
+        public string? Status { get; set; }
+    }
+}

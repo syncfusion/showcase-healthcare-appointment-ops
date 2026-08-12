@@ -1,0 +1,18 @@
+
+<div class="waitlist-factor-bar">
+    <div class="waitlist-factor-bar-header">
+        <span>@Label</span>
+        <span>@Caption</span>
+    </div>
+    <div class="waitlist-factor-bar-track">
+        <div class="waitlist-factor-bar-fill"
+             style="width:@(Math.Min(100, Math.Max(0, Percent)))%;background:@Color;"></div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public int Percent { get; set; }
+    [Parameter] public string Caption { get; set; } = string.Empty;
+    [Parameter] public string Color { get; set; } = "var(--color-sf-bg-brand-solid)";
+}

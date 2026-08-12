@@ -1,0 +1,488 @@
+@using HealthcareAppointmentOps.Blazor.Models.Dtos
+@using Syncfusion.Blazor.Calendars
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Popups
+
+@if (Visible)
+{
+    <SfDialog Width="640px"
+              IsModal="true"
+              ShowCloseIcon="true"
+              Header="New Appointment"
+              Visible="true"
+              Close="@(EventCallback.Factory.Create<CloseEventArgs>(this, args => OnCloseClicked()))">
+        <DialogButtons>
+            <DialogButton Content="Book Appointment"
+                          CssClass="e-primary"
+                          IsPrimary="true"
+                          Disabled="@(!CanSubmit || Loading || Submitting)"
+                          OnClick="@(EventCallback.Factory.Create<MouseEventArgs>(this, args => HandleSubmit()))" />
+            <DialogButton Content="Cancel"
+                          CssClass="e-outline"
+                          OnClick="@(EventCallback.Factory.Create<MouseEventArgs>(this, args => OnCloseClicked()))" />
+        </DialogButtons>
+
+        <div class="new-appt-dialog">
+            <div class="new-appt-row new-appt-row-header">
+                <label class="new-appt-label">Patient *</label>
+            </div>
+
+            <SfAutoComplete @ref="_patientAutoComplete"
+                            TValue="string"
+                            TItem="PatientSearchItem"
+                            Placeholder="Search by name or MRN"
+                            MinLength="2"
+                            SuggestionCount="10"
+                            IgnoreCase="true"
+                            FilterType="FilterType.Contains"
+                            Value="@_patientId"
+                            DataSource="@_patientData"
+                            SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending"
+                            ShowPopupButton="false"
+                            CssClass="@(HasError("patient") ? "e-error" : null)">
+                <AutoCompleteFieldSettings Value="PatientId" Text="Display" />
+                <AutoCompleteEvents TValue="string" TItem="PatientSearchItem" Filtering="OnPatientFiltering" ValueChange="OnPatientValueChange" />
+            </SfAutoComplete>
+            @if (HasError("patient"))
+            {
+                <FormFieldError Message="@Errors["patient"]" />
+            }
+
+            <div class="new-appt-grid-2">
+                <div>
+                    <label class="new-appt-label">Department *</label>
+                    <SfDropDownList TValue="string"
+                                    TItem="DepartmentOption"
+                                    Placeholder="Select department"
+                                    DataSource="@_departmentOptions"
+                                    Value="@_departmentId"
+                                    SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending">
+                        <DropDownListFieldSettings Text="DisplayLabel" Value="DepartmentId" />
+                        <DropDownListEvents TValue="string" TItem="DepartmentOption" ValueChange="OnDepartmentValueChange" />
+                    </SfDropDownList>
+                    @if (HasError("department"))
+                    {
+                        <FormFieldError Message="@Errors["department"]" />
+                    }
+                </div>
+                <div>
+                    <label class="new-appt-label">Location *</label>
+                    <SfDropDownList TValue="string"
+                                    TItem="LocationDto"
+                                    Placeholder="Select location"
+                                    Enabled="@(!string.IsNullOrEmpty(_departmentId))"
+                                    DataSource="@_locations"
+                                    Value="@_locationId"
+                                    SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending">
+                        <DropDownListFieldSettings Text="LocationName" Value="LocationId" />
+                        <DropDownListEvents TValue="string" TItem="LocationDto" ValueChange="OnLocationValueChange" />
+                    </SfDropDownList>
+                    @if (HasError("location"))
+                    {
+                        <FormFieldError Message="@Errors["location"]" />
+                    }
+                </div>
+            </div>
+
+            <div>
+                <label class="new-appt-label">Provider *</label>
+                <SfAutoComplete TValue="string"
+                                TItem="ProviderOption"
+                                Placeholder="@(string.IsNullOrEmpty(_departmentId) ? "Select a department first" : "Select provider")"
+                                Enabled="@(!string.IsNullOrEmpty(_departmentId))"
+                                DataSource="@_filteredProviderOptions"
+                                Value="@_providerId"
+                                SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending">
+                    <AutoCompleteFieldSettings Value="ProviderId" Text="DisplayName" />
+                    <AutoCompleteEvents TValue="string" TItem="ProviderOption" ValueChange="OnProviderValueChange" />
+                </SfAutoComplete>
+                @if (HasError("provider"))
+                {
+                    <FormFieldError Message="@Errors["provider"]" />
+                }
+            </div>
+
+            <div class="new-appt-grid-3">
+                <div>
+                    <label class="new-appt-label">Date &amp; Time *</label>
+                    <SfDateTimePicker TValue="DateTime?"
+                                      Value="@_scheduledDateTime"
+                                      ShowClearButton="true">
+                        <DateTimePickerEvents TValue="DateTime?" ValueChange="OnScheduledDateTimeValueChange" />
+                    </SfDateTimePicker>
+                    @if (HasError("scheduledDateTime"))
+                    {
+                        <FormFieldError Message="@Errors["scheduledDateTime"]" />
+                    }
+                </div>
+                <div>
+                    <label class="new-appt-label">Duration *</label>
+                    <SfDropDownList TValue="int"
+                                    TItem="DurationOption"
+                                    DataSource="@_durationOptions"
+                                    Value="@_durationMinutes"
+                                    SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending">
+                        <DropDownListFieldSettings Text="Text" Value="Value" />
+                        <DropDownListEvents TValue="int" TItem="DurationOption" ValueChange="OnDurationValueChange" />
+                    </SfDropDownList>
+                </div>
+                <div>
+                    <label class="new-appt-label">Type *</label>
+                    <SfDropDownList TValue="string"
+                                    TItem="string"
+                                    DataSource="@_appointmentTypeOptions"
+                                    Value="@_appointmentType"
+                                    SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending">
+                        <DropDownListEvents TValue="string" TItem="string" ValueChange="OnAppointmentTypeValueChange" />
+                    </SfDropDownList>
+                    @if (HasError("appointmentType"))
+                    {
+                        <FormFieldError Message="@Errors["appointmentType"]" />
+                    }
+                </div>
+            </div>
+
+            <div>
+                <label class="new-appt-label">Reason for Visit *</label>
+                <SfTextBox Multiline="true"
+                           Value="@_reasonForVisit"
+                           ValueChanged="@(EventCallback.Factory.Create<string>(this, value => OnReasonValueChange(value)))"
+                           Placeholder="Reason for visit" />
+                @if (HasError("reasonForVisit"))
+                {
+                    <FormFieldError Message="@Errors["reasonForVisit"]" />
+                }
+            </div>
+
+            <div>
+                <label class="new-appt-label">Notes</label>
+                <SfTextBox Multiline="true"
+                           Value="@_notes"
+                           ValueChanged="@(EventCallback.Factory.Create<string>(this, value => OnNotesValueChange(value)))"
+                           Placeholder="Optional notes" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(_conflictError))
+            {
+                <FormFieldError Message="@_conflictError" />
+            }
+        </div>
+    </SfDialog>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public DateTime? InitialDateTime { get; set; }
+    [Parameter] public string? InitialProviderId { get; set; }
+    [Parameter] public List<ProviderSummaryDto> Providers { get; set; } = new();
+    [Parameter] public List<DepartmentDto> Departments { get; set; } = new();
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<CreateAppointmentRequest> OnSubmit { get; set; }
+
+    [Inject] private PatientService PatientService { get; set; } = default!;
+    [Inject] private ReferenceDataService ReferenceDataService { get; set; } = default!;
+    [Inject] private AppointmentService AppointmentService { get; set; } = default!;
+
+    private string _patientId = string.Empty;
+    private List<PatientSearchItem> _patientData = new();
+    private SfAutoComplete<string, PatientSearchItem>? _patientAutoComplete;
+    private string _providerId = string.Empty;
+    private string _departmentId = string.Empty;
+    private string _locationId = string.Empty;
+    private List<LocationDto> _locations = new();
+    private List<DepartmentOption> _departmentOptions = new();
+    private List<ProviderOption> _filteredProviderOptions = new();
+    private string _appointmentType = string.Empty;
+    private DateTime? _scheduledDateTime;
+    private int _durationMinutes = 15;
+    private string _reasonForVisit = string.Empty;
+    private string _notes = string.Empty;
+
+    private bool Submitting;
+    private string _conflictError = string.Empty;
+    private Dictionary<string, string> Errors = new();
+    private bool _wasVisible;
+
+    private static readonly List<DurationOption> _durationOptions = new()
+    {
+        new() { Text = "15 min", Value = 15 },
+        new() { Text = "30 min", Value = 30 },
+        new() { Text = "45 min", Value = 45 },
+        new() { Text = "60 min", Value = 60 },
+    };
+
+    private static readonly List<string> _appointmentTypeOptions = new()
+    {
+        "New Patient",
+        "Follow-Up",
+        "Annual Physical",
+        "Urgent Visit",
+        "Consultation",
+        "Procedure",
+    };
+
+    private bool CanSubmit =>
+        !string.IsNullOrEmpty(_patientId) &&
+        !string.IsNullOrEmpty(_providerId) &&
+        !string.IsNullOrEmpty(_departmentId) &&
+        !string.IsNullOrEmpty(_locationId) &&
+        !string.IsNullOrEmpty(_appointmentType) &&
+        _scheduledDateTime.HasValue &&
+        !string.IsNullOrEmpty(_reasonForVisit);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Visible && !_wasVisible)
+        {
+            _patientId = string.Empty;
+            _patientData = new();
+            _providerId = InitialProviderId ?? string.Empty;
+            _departmentId = string.Empty;
+            _locationId = string.Empty;
+            _appointmentType = string.Empty;
+            _scheduledDateTime = InitialDateTime;
+            _durationMinutes = 15;
+            _reasonForVisit = string.Empty;
+            _notes = string.Empty;
+            Errors = new();
+            _conflictError = string.Empty;
+
+            _departmentOptions = Departments.Select(d => new DepartmentOption
+            {
+                DepartmentId = d.DepartmentId,
+                DepartmentName = d.DepartmentName,
+                LocationName = d.LocationName,
+                DisplayLabel = string.IsNullOrEmpty(d.LocationName) ? d.DepartmentName : $"{d.DepartmentName} — {d.LocationName}",
+            }).ToList();
+
+            _filteredProviderOptions = Providers.Select(p => new ProviderOption
+            {
+                ProviderId = p.ProviderId,
+                FirstName = p.FirstName,
+                LastName = p.LastName,
+                Specialty = p.Specialty,
+                DepartmentId = p.DepartmentId,
+                DisplayName = string.IsNullOrEmpty(p.Specialty) ? $"Dr. {p.LastName}" : $"Dr. {p.LastName} — {p.Specialty}",
+            }).ToList();
+
+            var locationsResult = await ReferenceDataService.GetLocationsAsync();
+            if (locationsResult.IsOk && locationsResult.Data is not null)
+                _locations = locationsResult.Data;
+        }
+
+        _wasVisible = Visible;
+    }
+
+    private bool HasError(string field) => Errors.TryGetValue(field, out var msg) && !string.IsNullOrEmpty(msg);
+
+    private async Task OnCloseClicked()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task OnPatientFiltering(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var text = args.Text ?? string.Empty;
+        if (text.Length < 2)
+            return;
+
+        var result = await PatientService.SearchPatientsAsync(text);
+        _patientData = result.IsOk && result.Data is not null
+            ? result.Data.Items.Select(p => new PatientSearchItem
+            {
+                PatientId = p.PatientId,
+                FirstName = p.FirstName,
+                LastName = p.LastName,
+                MedicalRecordNumber = p.MedicalRecordNumber,
+                DateOfBirth = p.DateOfBirth,
+                Gender = p.Gender,
+                Display = $"{p.LastName}, {p.FirstName} — MRN {p.MedicalRecordNumber}",
+            }).ToList()
+            : new();
+
+        if (_patientAutoComplete is not null)
+            await _patientAutoComplete.FilterAsync(_patientData);
+    }
+
+    private Task OnPatientValueChange(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, PatientSearchItem> args)
+    {
+        var item = args.ItemData ?? _patientData.FirstOrDefault(p => p.PatientId == args.Value);
+        if (item is not null && !string.IsNullOrEmpty(args.Value))
+        {
+            _patientId = item.PatientId;
+            Errors.Remove("patient");
+        }
+        else if (string.IsNullOrEmpty(args.Value))
+        {
+            _patientId = string.Empty;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void OnProviderValueChange(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, ProviderOption> args)
+    {
+        _providerId = args.Value ?? string.Empty;
+        Errors.Remove("provider");
+    }
+
+    private void OnDepartmentValueChange(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, DepartmentOption> args)
+    {
+        var value = args.Value ?? string.Empty;
+        if (value == _departmentId) return;
+        _departmentId = value;
+        Errors.Remove("department");
+        _filteredProviderOptions = Providers
+            .Where(p => string.IsNullOrEmpty(_departmentId) || p.DepartmentId == _departmentId)
+            .Select(p => new ProviderOption
+            {
+                ProviderId = p.ProviderId,
+                FirstName = p.FirstName,
+                LastName = p.LastName,
+                Specialty = p.Specialty,
+                DepartmentId = p.DepartmentId,
+                DisplayName = string.IsNullOrEmpty(p.Specialty) ? $"Dr. {p.LastName}" : $"Dr. {p.LastName} — {p.Specialty}",
+            })
+            .ToList();
+        if (!string.IsNullOrEmpty(_providerId) && _filteredProviderOptions.All(p => p.ProviderId != _providerId))
+            _providerId = string.Empty;
+        var dept = Departments.FirstOrDefault(d => d.DepartmentId == _departmentId);
+        if (dept is not null)
+            _locationId = dept.LocationId;
+    }
+
+    private void OnLocationValueChange(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, LocationDto> args)
+    {
+        _locationId = args.Value ?? string.Empty;
+        Errors.Remove("location");
+    }
+
+    private void OnAppointmentTypeValueChange(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, string> args)
+    {
+        _appointmentType = args.Value ?? string.Empty;
+        Errors.Remove("appointmentType");
+    }
+
+    private void OnScheduledDateTimeValueChange(Syncfusion.Blazor.Calendars.ChangedEventArgs<DateTime?> args)
+    {
+        _scheduledDateTime = args.Value;
+        Errors.Remove("scheduledDateTime");
+        _conflictError = string.Empty;
+    }
+
+    private void OnDurationValueChange(Syncfusion.Blazor.DropDowns.ChangeEventArgs<int, DurationOption> args)
+    {
+        _durationMinutes = args.Value;
+    }
+
+    private void OnReasonValueChange(string? value)
+    {
+        _reasonForVisit = value ?? string.Empty;
+        Errors.Remove("reasonForVisit");
+    }
+
+    private void OnNotesValueChange(string? value)
+    {
+        _notes = value ?? string.Empty;
+    }
+
+    private bool RunValidation()
+    {
+        Errors = new Dictionary<string, string>();
+        AddErrorIfInvalid("patient", _patientId);
+        AddErrorIfInvalid("provider", _providerId);
+        AddErrorIfInvalid("department", _departmentId);
+        AddErrorIfInvalid("location", _locationId);
+        AddErrorIfInvalid("scheduledDateTime", _scheduledDateTime);
+        AddErrorIfInvalid("appointmentType", _appointmentType);
+        AddErrorIfInvalid("reasonForVisit", _reasonForVisit);
+        return Errors.Count == 0;
+    }
+
+    private void AddErrorIfInvalid(string name, object? value)
+    {
+        var error = ValidateField(name, value);
+        if (!string.IsNullOrEmpty(error))
+            Errors[name] = error;
+    }
+
+    private static string ValidateField(string name, object? value)
+    {
+        var isEmpty = value is null || (value is string s && string.IsNullOrEmpty(s));
+        if (!isEmpty) return string.Empty;
+        var label = name switch
+        {
+            "scheduledDateTime" => "Date & time",
+            _ => char.ToUpperInvariant(name[0]) + name[1..],
+        };
+        return $"{label} is required";
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (Submitting) return;
+        if (!RunValidation() || !CanSubmit || !_scheduledDateTime.HasValue) return;
+        _conflictError = string.Empty;
+        Submitting = true;
+        try
+        {
+            var iso = _scheduledDateTime.Value.ToUniversalTime().ToString("O");
+            var conflicts = await AppointmentService.GetConflictsAsync(_providerId, iso, _durationMinutes);
+            if (conflicts.IsOk && conflicts.Data is { Count: > 0 })
+            {
+                _conflictError = "Provider has an overlapping appointment at this time.";
+                return;
+            }
+
+            var request = new CreateAppointmentRequest
+            {
+                PatientId = _patientId,
+                ProviderId = _providerId,
+                DepartmentId = _departmentId,
+                LocationId = _locationId,
+                AppointmentType = _appointmentType,
+                ScheduledDateTime = iso,
+                DurationMinutes = _durationMinutes,
+                ReasonForVisit = _reasonForVisit,
+                Notes = _notes,
+            };
+            await OnSubmit.InvokeAsync(request);
+        }
+        catch
+        {
+            _conflictError = "Could not verify conflicts. Try again.";
+        }
+        finally
+        {
+            Submitting = false;
+        }
+    }
+
+    private class DurationOption
+    {
+        public string Text { get; set; } = string.Empty;
+        public int Value { get; set; }
+    }
+
+    private class DepartmentOption
+    {
+        public string DepartmentId { get; set; } = string.Empty;
+        public string DepartmentName { get; set; } = string.Empty;
+        public string LocationName { get; set; } = string.Empty;
+        public string LocationId { get; set; } = string.Empty;
+        public string DisplayLabel { get; set; } = string.Empty;
+    }
+
+    private class ProviderOption
+    {
+        public string ProviderId { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Specialty { get; set; } = string.Empty;
+        public string DepartmentId { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,342 @@
+@using HealthcareAppointmentOps.Blazor.Models.Dtos
+@using HealthcareAppointmentOps.Blazor.Services
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Navigations
+@using Syncfusion.Blazor.Popups
+@using Syncfusion.Blazor.Inputs
+
+@if (IsOpen)
+{
+    @if (IsMobile)
+    {
+        <div class="detail-backdrop" @onclick="@(() => OnCloseClicked())"></div>
+    }
+    <SfSidebar Width="@SidebarWidth"
+               Position="SidebarPosition.Right"
+               Type="SidebarType.Over"
+               IsOpen="true"
+               EnableDock="false"
+               ShowBackdrop="false"
+               CloseOnDocumentClick="false"
+               zIndex="1000">
+        <ChildContent>
+            <div class="detail-root">
+                <div class="detail-close-row">
+                    <SfButton CssClass="e-flat e-small" OnClick="@(async () => await OnCloseClicked())" title="Close">✕</SfButton>
+                </div>
+                <div class="detail-body">
+                    @if (Loading)
+                    {
+                        <LoadingState Label="Loading appointment…" />
+                    }
+                    else if (!string.IsNullOrEmpty(LoadError))
+                    {
+                        <ErrorBanner Message="@LoadError" OnRetry="ReloadAsync" />
+                    }
+                    else if (Detail is null)
+                    {
+                        <div class="detail-empty">No appointment selected.</div>
+                    }
+                    else
+                    {
+                        var end = DateRangeUtils.TryParseDate(Detail.ScheduledDateTime)?.AddMinutes(Detail.DurationMinutes);
+
+                        <div class="detail-header-row">
+                            <StatusBadge Status="@Detail.Status.ToString()" />
+                            <div class="detail-header-actions">
+                                <SfButton CssClass="e-outline e-small" OnClick="HandleEdit">Edit</SfButton>
+                                @if (!IsTerminal)
+                                {
+                                    <SfButton CssClass="e-info e-small" OnClick="HandleCheckIn">Check In</SfButton>
+                                    <SfButton CssClass="e-danger e-small e-outline" OnClick="@(() => ConfirmAction = "cancel")">Cancel</SfButton>
+                                    <SfButton CssClass="e-warning e-small e-outline" OnClick="@(() => ConfirmAction = "noshow")">Mark No-Show</SfButton>
+                                }
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="new-appt-label">Status</label>
+                            <SfDropDownList TValue="AppointmentStatus?"
+                                            TItem="AppointmentStatus"
+                                            Placeholder="@($"Change from {Detail.Status}")"
+                                            DataSource="@StatusItems"
+                                            SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending">
+                                <DropDownListEvents TValue="AppointmentStatus?" TItem="AppointmentStatus" ValueChange="OnStatusChange" />
+                            </SfDropDownList>
+                        </div>
+
+                        <SectionBox Title="Patient">
+                            <Row Label="Name" Value="@Detail.PatientName" />
+                            <Row Label="MRN" Value="@Detail.PatientMrn" />
+                        </SectionBox>
+
+                        <SectionBox Title="Provider">
+                            <Row Label="Name" Value="@Detail.ProviderName" />
+                            <Row Label="Specialty" Value="@Detail.ProviderSpecialty" />
+                            <Row Label="Department" Value="@Detail.DepartmentName" />
+                        </SectionBox>
+
+                        <SectionBox Title="Timing">
+                            <Row Label="Scheduled" Value="@FormatDate(Detail.ScheduledDateTime)" />
+                            <Row Label="Duration" Value="@($"{Detail.DurationMinutes} min")" />
+                            <Row Label="End" Value="@DateFormats.FormatDateTime(end)" />
+                            @if (!string.IsNullOrEmpty(Detail.CheckedInDateTime))
+                            {
+                                <Row Label="Checked In" Value="@FormatDate(Detail.CheckedInDateTime)" />
+                            }
+                            @if (!string.IsNullOrEmpty(Detail.CompletedDateTime))
+                            {
+                                <Row Label="Completed" Value="@FormatDate(Detail.CompletedDateTime)" />
+                            }
+                        </SectionBox>
+
+                        <SectionBox Title="Notes">
+                            <Row Label="Reason for Visit" Value="@Detail.ReasonForVisit" />
+                            <Row Label="Notes" Value="@(string.IsNullOrEmpty(Detail.Notes) ? "—" : Detail.Notes)" />
+                            <Row Label="Patient Instructions" Value="@(string.IsNullOrEmpty(Detail.PatientInstructions) ? "—" : Detail.PatientInstructions)" />
+                            @if (!string.IsNullOrEmpty(Detail.CancellationReason))
+                            {
+                                <Row Label="Cancellation Reason" Value="@Detail.CancellationReason" />
+                            }
+                        </SectionBox>
+
+                        <SectionBox Title="Audit Trail (last 5)">
+                            @if (Audit.Count == 0)
+                            {
+                                <div class="detail-empty">No audit entries.</div>
+                            }
+                            else
+                            {
+                                <ul class="detail-audit">
+                                    @foreach (var entry in Audit)
+                                    {
+                                        <li>
+                                            <div class="detail-audit-action">@entry.Action</div>
+                                            <div class="detail-audit-meta">by @entry.PerformedBy · @FormatDate(entry.PerformedAt)</div>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </SectionBox>
+                    }
+                </div>
+            </div>
+        </ChildContent>
+    </SfSidebar>
+
+    @if (ConfirmAction == "cancel" && Detail is not null)
+    {
+        <SfDialog Width="420px" IsModal="true" ShowCloseIcon="true" Header="Cancel Appointment" Visible="true">
+            <DialogButtons>
+                <DialogButton Content="Confirm Cancel" CssClass="e-danger" IsPrimary="true" Disabled="@string.IsNullOrWhiteSpace(CancelReason)" OnClick="OnConfirmCancelClick" />
+                <DialogButton Content="Keep Appointment" CssClass="e-flat" OnClick="OnDismissDialogClick" />
+            </DialogButtons>
+            <p class="detail-confirm-text">Please provide a cancellation reason (required):</p>
+            <SfTextBox Multiline="true" Value="@CancelReason" ValueChanged="@((string v) => CancelReason = v)" Placeholder="Cancellation reason" />
+        </SfDialog>
+    }
+
+    @if (ConfirmAction == "noshow" && Detail is not null)
+    {
+        <SfDialog Width="420px" IsModal="true" ShowCloseIcon="true" Header="Mark No-Show" Visible="true">
+            <DialogButtons>
+                <DialogButton Content="Confirm No-Show" CssClass="e-warning" IsPrimary="true" OnClick="OnConfirmNoShowClick" />
+                <DialogButton Content="Dismiss" CssClass="e-flat" OnClick="OnDismissDialogClick" />
+            </DialogButtons>
+            <p class="detail-confirm-text">Mark this appointment as No-Show for @Detail.PatientName?</p>
+        </SfDialog>
+    }
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string? AppointmentId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    [Inject] private AppointmentService AppointmentService { get; set; } = default!;
+    [Inject] private AuditLogService AuditLogService { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
+    private AppointmentDetailDto? Detail;
+    private List<AuditLogDto> Audit = new();
+    private bool Loading;
+    private string LoadError = string.Empty;
+    private string? ConfirmAction;
+    private string CancelReason = string.Empty;
+    private bool IsMobile;
+
+    private static readonly AppointmentStatus[] StatusWorkflow = new[]
+    {
+        AppointmentStatus.Scheduled,
+        AppointmentStatus.Confirmed,
+        AppointmentStatus.CheckedIn,
+        AppointmentStatus.InProgress,
+        AppointmentStatus.Completed,
+    };
+
+    private static readonly AppointmentStatus[] TerminalStatuses = new[]
+    {
+        AppointmentStatus.Completed,
+        AppointmentStatus.Cancelled,
+        AppointmentStatus.NoShow,
+    };
+
+    private bool IsTerminal => Detail is not null && TerminalStatuses.Contains(Detail.Status);
+
+    private List<AppointmentStatus> StatusItems
+    {
+        get
+        {
+            if (Detail is null) return new();
+            var items = StatusWorkflow.Where(s => s != Detail.Status).ToList();
+            if (Detail.Status != AppointmentStatus.Cancelled) items.Add(AppointmentStatus.Cancelled);
+            if (Detail.Status != AppointmentStatus.NoShow) items.Add(AppointmentStatus.NoShow);
+            return items;
+        }
+    }
+
+    private string SidebarWidth => IsMobile ? "100%" : "420px";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !string.IsNullOrEmpty(AppointmentId))
+        {
+            CancelReason = string.Empty;
+            await LoadAsync(AppointmentId);
+        }
+        else if (!IsOpen)
+        {
+            Detail = null;
+            Audit = new();
+            LoadError = string.Empty;
+            ConfirmAction = null;
+            CancelReason = string.Empty;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                IsMobile = await JS.InvokeAsync<bool>("healthOpsMedia.isMobile");
+            }
+            catch
+            {
+                IsMobile = false;
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadAsync(string id)
+    {
+        Loading = true;
+        LoadError = string.Empty;
+        try
+        {
+            var detailTask = AppointmentService.GetAppointmentAsync(id);
+            var auditTask = AuditLogService.GetAuditLogsAsync("Appointment", id, new PagingRequest { Offset = 0, Limit = 5 });
+            await Task.WhenAll(detailTask, auditTask);
+            var detail = detailTask.Result;
+            var audit = auditTask.Result;
+            if (detail.IsOk && detail.Data is not null)
+                Detail = detail.Data;
+            else
+                LoadError = detail.Error?.Detail ?? detail.Error?.Title ?? "Failed to load appointment";
+            Audit = audit.IsOk && audit.Data is not null ? audit.Data.Items : new();
+        }
+        catch (Exception ex)
+        {
+            LoadError = ex.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (!string.IsNullOrEmpty(AppointmentId))
+            await LoadAsync(AppointmentId);
+    }
+
+    private async Task OnStatusChange(Syncfusion.Blazor.DropDowns.ChangeEventArgs<AppointmentStatus?, AppointmentStatus> args)
+    {
+        if (args.Value is not { } next || Detail is null) return;
+        if (next == AppointmentStatus.Cancelled)
+        {
+            ConfirmAction = "cancel";
+            return;
+        }
+        if (next == AppointmentStatus.NoShow)
+        {
+            ConfirmAction = "noshow";
+            return;
+        }
+        var res = await AppointmentService.TransitionStatusAsync(Detail.AppointmentId, next);
+        if (res.IsOk && res.Data is not null) Detail = res.Data;
+        await AfterChangeAsync();
+    }
+
+    private async Task HandleCheckIn()
+    {
+        if (Detail is null) return;
+        var res = await AppointmentService.CheckInAsync(Detail.AppointmentId, "FrontDesk");
+        if (res.IsOk && res.Data is not null) Detail = res.Data;
+        await AfterChangeAsync();
+    }
+
+    private void HandleEdit()
+    {
+    }
+
+    private async Task RunCancel()
+    {
+        if (Detail is null) return;
+        var res = await AppointmentService.CancelAsync(Detail.AppointmentId, CancelReason);
+        if (res.IsOk && res.Data is not null) Detail = res.Data;
+        ConfirmAction = null;
+        CancelReason = string.Empty;
+        await AfterChangeAsync();
+    }
+
+    private async Task RunNoShow()
+    {
+        if (Detail is null) return;
+        var res = await AppointmentService.NoShowAsync(Detail.AppointmentId);
+        if (res.IsOk && res.Data is not null) Detail = res.Data;
+        ConfirmAction = null;
+        await AfterChangeAsync();
+    }
+
+    private void CancelConfirm() => ConfirmAction = null;
+
+    private void OnCancelReasonChange(Syncfusion.Blazor.Inputs.ChangeEventArgs<string> args) => CancelReason = args.Value ?? string.Empty;
+
+    private void OnDialogClose() => CancelConfirm();
+
+    private async Task OnConfirmCancelClick() => await RunCancel();
+
+    private async Task OnConfirmNoShowClick() => await RunNoShow();
+
+    private void OnDismissDialogClick() => CancelConfirm();
+
+    private async Task OnCloseClicked() => await OnClose.InvokeAsync();
+
+    private async Task AfterChangeAsync()
+    {
+        if (Detail is not null)
+            await ReloadAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private static string FormatDate(string? value)
+    {
+        return DateFormats.FormatDate(value);
+    }
+}

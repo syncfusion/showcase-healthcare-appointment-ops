@@ -1,0 +1,391 @@
+@page "/providers/{ProviderId}"
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Navigations
+@using Syncfusion.Blazor.Schedule
+@using HealthcareAppointmentOps.Blazor.Components.Shared
+@using HealthcareAppointmentOps.Blazor.Components.Shared.Providers
+@inject ProviderService ProviderService
+@inject AppointmentService AppointmentService
+@inject AnalyticsService AnalyticsService
+
+<PageTitle>Provider Details | Healthcare Appointment and Patient Operations Portal</PageTitle>
+
+@if (!string.IsNullOrEmpty(_providerError) && Provider is null)
+{
+    <ErrorBanner Title="Failed to load provider" Message="@_providerError" OnRetry="LoadProviderAsync" />
+}
+else if (Provider is null && _providerLoading)
+{
+    <LoadingState Label="Loading provider…" />
+}
+else if (Provider is null)
+{
+    <EmptyState Title="Provider not found" Description="The requested provider does not exist." />
+}
+else if (Provider is not null)
+{
+    <div class="provider-detail-page">
+        <div class="provider-header">
+            <InitialsAvatar FirstName="@Provider.FirstName" LastName="@Provider.LastName" Size="64" />
+            <div class="provider-header-info">
+                <div class="provider-header-name">
+                    Dr. @Provider.FirstName @Provider.LastName@(string.IsNullOrEmpty(Provider.Title) ? "" : $", {Provider.Title}")
+                </div>
+                <div class="provider-header-meta">
+                    @Provider.Specialty • @Provider.LocationName
+                </div>
+                <div class="provider-header-submeta">
+                    NPI: @Provider.NpiNumber • @Provider.PhoneNumber
+                </div>
+            </div>
+        </div>
+
+        <div class="provider-kpi-row">
+            <KpiCard Title="Appointments Today"
+                     Value="@Kpis.ApptsToday.ToString()"
+                     Loading="@_apptsLoading"
+                     Icon="@AppIcon.CalendarDays(16)" />
+            <KpiCard Title="Patients This Week"
+                     Value="@Kpis.PatientsThisWeek.ToString()"
+                     Loading="@_apptsLoading"
+                     Icon="@AppIcon.Users(16)" />
+            <KpiCard Title="Utilization"
+                     Value="@FormatPct(_overallUtilization)"
+                     Loading="@_utilizationLoading"
+                     Icon="@AppIcon.Activity(16)" />
+            <KpiCard Title="Cancellation Rate"
+                     Value="@FormatPct(Kpis.CancellationRate)"
+                     Loading="@_apptsLoading"
+                     Icon="@AppIcon.XCircle(16)" />
+            <KpiCard Title="No-Show Rate"
+                     Value="@FormatPct(Kpis.NoShowRate)"
+                     Loading="@_apptsLoading"
+                     Icon="@AppIcon.UserX(16)" />
+        </div>
+
+        <SfTab CssClass="provider-tabs" LoadOn="ContentLoad.Demand">
+            <TabItems>
+                <TabItem>
+                    <ChildContent>
+                        <TabHeader Text="Schedule" />
+                    </ChildContent>
+                    <ContentTemplate>
+                        <ProviderScheduleTab
+                            Events="@_scheduleEvents"
+                            Loading="@_apptsLoading"
+                            Error="@_apptsError"
+                            OnRetry="LoadAppointmentsAsync"
+                            OnNavigate="OnScheduleNavigateAsync"
+                            SelectedDate="@DateTime.Today" />
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent>
+                        <TabHeader Text="Analytics" />
+                    </ChildContent>
+                    <ContentTemplate>
+                        <ProviderAnalyticsTab
+                            UtilizationData="@_utilizationTrend"
+                            UtilizationLoading="@_utilizationLoading"
+                            UtilizationError="@_utilizationError"
+                            OnUtilizationRetry="LoadUtilizationAsync"
+                            NoShowData="@_noShowTrend"
+                            NoShowLoading="@_noShowLoading"
+                            NoShowError="@_noShowError"
+                            OnNoShowRetry="LoadNoShowAsync"
+                            DepartmentName="@Provider.DepartmentName" />
+                    </ContentTemplate>
+                </TabItem>
+            </TabItems>
+        </SfTab>
+    </div>
+}
+
+@code {
+    [Parameter] public string ProviderId { get; set; } = string.Empty;
+
+    private ProviderDetailDto? Provider { get; set; }
+    private bool _providerLoading;
+    private string? _providerError;
+
+    private List<ScheduleEventData> _scheduleEvents = new();
+    private List<AppointmentSummaryDto> _appointments = new();
+    private bool _apptsLoading;
+    private string? _apptsError;
+
+    private double? _overallUtilization;
+    private List<ProviderAnalyticsTab.TrendPoint> _utilizationTrend = new();
+    private bool _utilizationLoading;
+    private string? _utilizationError;
+
+    private List<ProviderAnalyticsTab.TrendPoint> _noShowTrend = new();
+    private bool _noShowLoading;
+    private string? _noShowError;
+
+    private ProviderKpis Kpis { get; set; } = new();
+
+    private static readonly string[] Months =
+        { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProviderAsync();
+        if (Provider is null) return;
+
+        await Task.WhenAll(
+            LoadAppointmentsAsync(),
+            LoadUtilizationAsync(),
+            LoadNoShowAsync());
+    }
+
+    private async Task LoadProviderAsync()
+    {
+        _providerLoading = true;
+        _providerError = null;
+        try
+        {
+            var res = await ProviderService.GetProviderAsync(ProviderId);
+            if (res.IsOk && res.Data is not null)
+            {
+                Provider = res.Data;
+            }
+            else
+            {
+                _providerError = res.Error?.Title ?? "Failed to load provider.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _providerError = ex.Message;
+        }
+        finally
+        {
+            _providerLoading = false;
+        }
+    }
+
+    private async Task LoadAppointmentsAsync()
+    {
+        var from = DateTime.Today.AddDays(-30);
+        var to = DateTime.Today.AddDays(14);
+
+        _apptsLoading = true;
+        _apptsError = null;
+        try
+        {
+            var filter = new AppointmentFilterRequest
+            {
+                ProviderId = ProviderId,
+                FromDate = ToYmd(from),
+                ToDate = ToYmd(to),
+            };
+            var res = await AppointmentService.GetAppointmentsAsync(filter, new PagingRequest { Offset = 0, Limit = 500 });
+            if (res.IsOk && res.Data is not null)
+            {
+                _appointments = res.Data.Items;
+            }
+            else
+            {
+                _apptsError = res.Error?.Title ?? "Failed to load appointments.";
+                _appointments = new();
+            }
+        }
+        catch (Exception ex)
+        {
+            _apptsError = ex.Message;
+            _appointments = new();
+        }
+        finally
+        {
+            _apptsLoading = false;
+            _scheduleEvents = _appointments.Select(a => ScheduleEventData.FromDto(a, ProviderId)).ToList();
+            Kpis = ComputeKpis(_appointments, DateTime.Today);
+        }
+    }
+
+    private async Task OnScheduleNavigateAsync(DateTime date)
+    {
+        var monthStart = new DateTime(date.Year, date.Month, 1);
+        var from = monthStart.AddDays(-7);
+        var to = monthStart.AddMonths(1).AddDays(7);
+        try
+        {
+            var filter = new AppointmentFilterRequest
+            {
+                ProviderId = ProviderId,
+                FromDate = ToYmd(from),
+                ToDate = ToYmd(to),
+            };
+            var res = await AppointmentService.GetAppointmentsAsync(filter, new PagingRequest { Offset = 0, Limit = 500 });
+            if (res.IsOk && res.Data is not null)
+            {
+                _scheduleEvents = res.Data.Items.Select(a => ScheduleEventData.FromDto(a, ProviderId)).ToList();
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task LoadUtilizationAsync()
+    {
+        var start = DateTime.Today.AddMonths(-6);
+        var end = DateTime.Today;
+
+        _utilizationLoading = true;
+        _utilizationError = null;
+        try
+        {
+            var res = await AnalyticsService.GetProviderUtilizationAsync(ToYmd(start), ToYmd(end), ProviderId);
+            if (res.IsOk && res.Data is not null)
+            {
+                var rows = res.Data;
+
+                var byMonth = new Dictionary<string, MonthAggregate>();
+                foreach (var r in rows)
+                {
+                    var key = r.Date.Length >= 7 ? r.Date.Substring(0, 7) : r.Date;
+                    if (!byMonth.TryGetValue(key, out var agg))
+                    {
+                        agg = new MonthAggregate { Key = key };
+                        byMonth[key] = agg;
+                    }
+                    agg.Appts += r.AppointmentCount;
+                    agg.Slots += r.TotalSlots;
+                }
+
+                _utilizationTrend = byMonth.Values
+                    .OrderBy(m => m.Key)
+                    .Select(m => new ProviderAnalyticsTab.TrendPoint
+                    {
+                        Month = MonthLabel(m.Key),
+                        Rate = m.Slots > 0 ? Math.Round(100.0 * m.Appts / m.Slots) : 0,
+                    })
+                    .ToList();
+
+                var totalAppts = rows.Sum(r => r.AppointmentCount);
+                var totalSlots = rows.Sum(r => r.TotalSlots);
+                _overallUtilization = totalSlots > 0 ? Math.Round(100.0 * totalAppts / totalSlots) : null;
+            }
+            else
+            {
+                _utilizationError = res.Error?.Title ?? "Failed to load utilization.";
+                _utilizationTrend = new();
+                _overallUtilization = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _utilizationError = ex.Message;
+            _utilizationTrend = new();
+            _overallUtilization = null;
+        }
+        finally
+        {
+            _utilizationLoading = false;
+        }
+    }
+
+    private async Task LoadNoShowAsync()
+    {
+        if (Provider is null) return;
+
+        var start = DateTime.Today.AddMonths(-6);
+        var end = DateTime.Today;
+
+        _noShowLoading = true;
+        _noShowError = null;
+        try
+        {
+            var res = await AnalyticsService.GetNoShowTrendsAsync(ToYmd(start), ToYmd(end), Provider.DepartmentId);
+            if (res.IsOk && res.Data is not null)
+            {
+                _noShowTrend = res.Data
+                    .OrderBy(r => r.Period)
+                    .Select(r => new ProviderAnalyticsTab.TrendPoint
+                    {
+                        Month = MonthLabel(r.Period),
+                        Rate = double.IsFinite(r.NoShowRate) ? Math.Round(r.NoShowRate * 1000) / 10.0 : 0,
+                    })
+                    .ToList();
+            }
+            else
+            {
+                _noShowError = res.Error?.Title ?? "Failed to load no-show trend.";
+                _noShowTrend = new();
+            }
+        }
+        catch (Exception ex)
+        {
+            _noShowError = ex.Message;
+            _noShowTrend = new();
+        }
+        finally
+        {
+            _noShowLoading = false;
+        }
+    }
+
+    private static ProviderKpis ComputeKpis(IReadOnlyList<AppointmentSummaryDto> appointments, DateTime today)
+    {
+        var startWeek = StartOfWeek(today).Ticks;
+        var endWeek = startWeek + TimeSpan.FromDays(7).Ticks;
+        var todayYmd = ToYmd(today);
+
+        int apptsToday = 0, cancelled = 0, noShow = 0;
+        var weekPatients = new HashSet<string>();
+
+        foreach (var a in appointments)
+        {
+            if (!DateTime.TryParse(a.ScheduledDateTime, out var t)) continue;
+
+            if (ToYmd(t) == todayYmd) apptsToday++;
+            if (t.Ticks >= startWeek && t.Ticks < endWeek) weekPatients.Add(a.PatientId);
+            if (a.Status == AppointmentStatus.Cancelled) cancelled++;
+            if (a.Status == AppointmentStatus.NoShow) noShow++;
+        }
+
+        var total = appointments.Count;
+        return new ProviderKpis
+        {
+            ApptsToday = apptsToday,
+            PatientsThisWeek = weekPatients.Count,
+            CancellationRate = total > 0 ? (100.0 * cancelled) / total : (double?)null,
+            NoShowRate = total > 0 ? (100.0 * noShow) / total : (double?)null,
+        };
+    }
+
+    private static DateTime StartOfWeek(DateTime d)
+    {
+        var date = d.Date;
+        return date.AddDays(-date.Day).Date;
+    }
+
+    private static string ToYmd(DateTime d) => $"{d.Year:0000}-{d.Month:00}-{d.Day:00}";
+
+    private static string MonthLabel(string period)
+    {
+        var parts = period.Split('-');
+        if (parts.Length >= 2 && int.TryParse(parts[1], out var m) && m >= 1 && m <= 12)
+            return Months[m - 1];
+        return period;
+    }
+
+    private static string FormatPct(double? value) => value is null ? "—" : $"{value:F1}%";
+
+    private sealed class ProviderKpis
+    {
+        public int ApptsToday { get; set; }
+        public int PatientsThisWeek { get; set; }
+        public double? CancellationRate { get; set; }
+        public double? NoShowRate { get; set; }
+    }
+
+    private sealed class MonthAggregate
+    {
+        public string Key { get; set; } = string.Empty;
+        public int Appts { get; set; }
+        public int Slots { get; set; }
+    }
+}

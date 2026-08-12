@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\HealthcareAppointmentOps.Application\HealthcareAppointmentOps.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <PackageReference Include="Syncfusion.Pdf.Net.Core" Version="33.1.49" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\Fonts\Inter-Regular.ttf" />
+    <EmbeddedResource Include="Assets\Fonts\Inter-Medium.ttf" />
+    <EmbeddedResource Include="Assets\Fonts\Inter-SemiBold.ttf" />
+    <EmbeddedResource Include="Assets\Fonts\Inter-Bold.ttf" />
+  </ItemGroup>
+
+</Project>

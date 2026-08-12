@@ -1,0 +1,220 @@
+@using Syncfusion.Blazor.Grids
+@inject PatientService PatientService
+
+@if (_loading)
+{
+    <LoadingState Inline="true" Label="Loading medications…" />
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <ErrorBanner Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_data is null)
+{
+    <EmptyState Title="No medications" Description="No medication records found for this patient." />
+}
+else
+{
+    <div class="meds-tab">
+        <div class="adherence-card">
+            <SfProgressBar Type="ProgressType.Circular"
+                           Value="@_data.AdherencePct"
+                           Minimum="0" Maximum="100"
+                           Height="120" Width="120"
+                           TrackThickness="10" ProgressThickness="10"
+                           CornerRadius="CornerType.Round"
+                           ProgressColor="@AdherenceHex">
+            </SfProgressBar>
+            <div class="adherence-copy">
+                <div class="adherence-label">Adherence (last 90 days)</div>
+                <div class="adherence-value" style="color: @AdherenceVar;">@_data.AdherencePct.ToString("F1")%</div>
+                <div class="adherence-hint">
+                    @(_data.AdherencePct >= 80 ? "On track" : _data.AdherencePct >= 50 ? "Monitor — below target" : "Outreach recommended")
+                </div>
+            </div>
+        </div>
+
+        <SfTab CssClass="meds-subtabs">
+            <TabItems>
+                <TabItem>
+                    <ChildContent>
+                        <TabHeader Text="@($"Active ({_data.Active.Count})")" />
+                    </ChildContent>
+                    <ContentTemplate>
+                        <div class="meds-subtab-panel">
+                            @if (_data.Active.Count == 0)
+                            {
+                                <EmptyState Title="No active medications" Description="This patient has no active prescriptions." />
+                            }
+                            else
+                            {
+                                <SfGrid @ref="_activeGrid" DataSource="_data.Active" TValue="MedicationDto" Width="100%" AllowPaging="true" AllowSorting="true" AllowExcelExport="true" Toolbar="@(new List<string> { "ExcelExport" })">
+                                    <GridPageSettings PageSize="10" />
+                                    <GridEvents TValue="MedicationDto" OnToolbarClick="OnActiveToolbarClick" />
+                                    <GridColumns>
+                                        <GridColumn Field="@nameof(MedicationDto.MedicationName)" HeaderText="Medication" Width="160" />
+                                        <GridColumn Field="@nameof(MedicationDto.Dosage)" HeaderText="Dosage" Width="100" />
+                                        <GridColumn Field="@nameof(MedicationDto.Frequency)" HeaderText="Frequency" Width="130" />
+                                        <GridColumn Field="@nameof(MedicationDto.Route)" HeaderText="Route" Width="100" />
+                                        <GridColumn Field="@nameof(MedicationDto.PrescriberName)" HeaderText="Prescriber" Width="160" />
+                                        <GridColumn Field="@nameof(MedicationDto.StartDate)" HeaderText="Started" Width="120">
+                                            <Template>@FormatDate(((MedicationDto)context).StartDate)</Template>
+                                        </GridColumn>
+                                        <GridColumn Field="@nameof(MedicationDto.RefillsRemaining)" HeaderText="Refills Left" Width="110" />
+                                        <GridColumn Field="@nameof(MedicationDto.Pharmacy)" HeaderText="Pharmacy" Width="140" />
+                                        <GridColumn Field="@nameof(MedicationDto.Status)" HeaderText="Status" Width="110">
+                                            <Template><StatusBadge Status="@(((MedicationDto)context).Status)" /></Template>
+                                        </GridColumn>
+                                        <GridColumn HeaderText="Action" Width="140" AllowSorting="false" AllowFiltering="false">
+                                            <Template>
+                                                @{
+                                                    var med = (MedicationDto)context;
+                                                }
+                                                <SfButton CssClass="e-info e-small e-outline" OnClick="@(args => RequestRefillAsync(med))">Request Refill</SfButton>
+                                            </Template>
+                                        </GridColumn>
+                                    </GridColumns>
+                                </SfGrid>
+                            }
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent>
+                        <TabHeader Text="@($"History ({_data.History.Count})")" />
+                    </ChildContent>
+                    <ContentTemplate>
+                        <div class="meds-subtab-panel">
+                            @if (_data.History.Count == 0)
+                            {
+                                <EmptyState Title="No medication history" />
+                            }
+                            else
+                            {
+                                <SfGrid DataSource="_data.History" TValue="MedicationDto" Width="100%" AllowPaging="true" AllowSorting="true">
+                                    <GridPageSettings PageSize="10" />
+                                    <GridColumns>
+                                        <GridColumn Field="@nameof(MedicationDto.MedicationName)" HeaderText="Medication" Width="160" />
+                                        <GridColumn Field="@nameof(MedicationDto.Dosage)" HeaderText="Dosage" Width="100" />
+                                        <GridColumn Field="@nameof(MedicationDto.Frequency)" HeaderText="Frequency" Width="130" />
+                                        <GridColumn Field="@nameof(MedicationDto.StartDate)" HeaderText="Started" Width="120">
+                                            <Template>@FormatDate(((MedicationDto)context).StartDate)</Template>
+                                        </GridColumn>
+                                        <GridColumn Field="@nameof(MedicationDto.EndDate)" HeaderText="Stopped" Width="120">
+                                            <Template>@FormatDate(((MedicationDto)context).EndDate)</Template>
+                                        </GridColumn>
+                                        <GridColumn Field="@nameof(MedicationDto.StopReason)" HeaderText="Stop Reason" Width="180" />
+                                        <GridColumn Field="@nameof(MedicationDto.PrescriberName)" HeaderText="Prescriber" Width="160" />
+                                        <GridColumn Field="@nameof(MedicationDto.Status)" HeaderText="Status" Width="120">
+                                            <Template><StatusBadge Status="@(((MedicationDto)context).Status)" /></Template>
+                                        </GridColumn>
+                                    </GridColumns>
+                                </SfGrid>
+                            }
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent>
+                        <TabHeader Text="@($"Refills ({_data.RecentRefills.Count})")" />
+                    </ChildContent>
+                    <ContentTemplate>
+                        <div class="meds-subtab-panel">
+                            @if (_data.RecentRefills.Count == 0)
+                            {
+                                <EmptyState Title="No refill history" />
+                            }
+                            else
+                            {
+                                <SfGrid DataSource="_data.RecentRefills" TValue="MedicationRefillDto" Width="100%" AllowPaging="true" AllowSorting="true">
+                                    <GridPageSettings PageSize="10" />
+                                    <GridColumns>
+                                        <GridColumn Field="@nameof(MedicationRefillDto.MedicationName)" HeaderText="Medication" Width="180" />
+                                        <GridColumn Field="@nameof(MedicationRefillDto.RefillDate)" HeaderText="Refill Date" Width="150">
+                                            <Template>@FormatDate(((MedicationRefillDto)context).RefillDate)</Template>
+                                        </GridColumn>
+                                        <GridColumn Field="@nameof(MedicationRefillDto.Status)" HeaderText="Status" Width="120">
+                                            <Template><StatusBadge Status="@(((MedicationRefillDto)context).Status)" /></Template>
+                                        </GridColumn>
+                                    </GridColumns>
+                                </SfGrid>
+                            }
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+            </TabItems>
+        </SfTab>
+
+        @if (!string.IsNullOrEmpty(_toast))
+        {
+            <div class="sticky-toast">✓ @_toast</div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string PatientId { get; set; } = string.Empty;
+
+    private SfGrid<MedicationDto>? _activeGrid;
+    private MedicationHistoryDto? _data;
+    private bool _loading = true;
+    private string? _error;
+    private string? _toast;
+    private int _toastToken;
+
+    private string AdherenceHex =>
+        _data is null ? "#16A34A" :
+        _data.AdherencePct >= 80 ? "#16A34A" :
+        _data.AdherencePct >= 50 ? "#D97706" : "#DC2626";
+
+    private string AdherenceVar =>
+        _data is null ? "var(--color-sf-fg-success-primary)" :
+        _data.AdherencePct >= 80 ? "var(--color-sf-fg-success-primary)" :
+        _data.AdherencePct >= 50 ? "var(--color-sf-fg-warning-primary)" : "var(--color-sf-fg-error-primary)";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var result = await PatientService.GetPatientMedicationsAsync(PatientId);
+            if (result.IsOk)
+                _data = result.Data;
+            else
+                _error = result.Error?.Title ?? "Failed to load medications.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        _loading = false;
+    }
+
+    private async Task OnActiveToolbarClick(Syncfusion.Blazor.Navigations.ClickEventArgs args)
+    {
+        if (_activeGrid is not null && args.Item.Id == _activeGrid.ID + "_excelexport")
+            await _activeGrid.ExportToExcelAsync();
+    }
+
+    private async Task RequestRefillAsync(MedicationDto med)
+    {
+        _toast = $"Refill request submitted for {med.MedicationName} ({med.Dosage}).";
+        var token = ++_toastToken;
+        StateHasChanged();
+        await Task.Delay(3500);
+        if (token == _toastToken)
+        {
+            _toast = null;
+            StateHasChanged();
+        }
+    }
+
+    private static string FormatDate(string? iso) =>
+        DateFormats.FormatDate(iso);
+}

@@ -1,0 +1,71 @@
+<div class="provider-list">
+  @if (error(); as err) {
+    <app-error-banner title="Unable to load providers" [message]="err" (retry)="retry()"></app-error-banner>
+  }
+
+  @if (loading() && items().length === 0) {
+    <app-loading-state label="Loading providers…"></app-loading-state>
+  } @else if (items().length === 0) {
+    <app-empty-state
+      title="No providers found"
+      description="Provider data will appear once the backend is seeded.">
+    </app-empty-state>
+  } @else {
+    <ejs-grid
+      #grid
+      [dataSource]="items()"
+      [allowPaging]="true"
+      [allowSorting]="true"
+      [allowFiltering]="true"
+      [filterSettings]="filterSettings"
+      [pageSettings]="pageSettings"
+      [toolbar]="toolbar">
+      <e-columns>
+        <e-column headerText="Provider" width="260" field="lastName">
+          <ng-template #template let-data>
+            <div class="provider-cell">
+              <span class="provider-avatar">{{ initials(data) }}</span>
+              <span class="provider-name">{{ providerName(data) }}</span>
+            </div>
+          </ng-template>
+        </e-column>
+        <e-column field="specialty" headerText="Specialty" width="160">
+          <ng-template #template let-data>
+            <span class="specialty-chip" [ngStyle]="chipStyle(data.specialty)">{{ data.specialty }}</span>
+          </ng-template>
+        </e-column>
+        <e-column field="averageAppointmentDuration" headerText="Avg Duration" width="130">
+          <ng-template #template let-data>
+            @if (avgDuration(data) === 0) {
+              <span class="cell-muted">—</span>
+            } @else {
+              <span class="avg-duration">{{ avgDuration(data) }} min</span>
+            }
+          </ng-template>
+        </e-column>
+        <e-column field="locationName" headerText="Location" width="160" hideAtMedia="(max-width: 1023px)"></e-column>
+        <e-column field="npiNumber" headerText="NPI" width="120" hideAtMedia="(max-width: 1023px)"></e-column>
+        <e-column field="phoneNumber" headerText="Phone" width="140"></e-column>
+        <e-column field="isActive" headerText="Status" width="100" hideAtMedia="(max-width: 640px)">
+          <ng-template #template let-data>
+            <app-status-badge [status]="data.isActive ? 'Active' : 'Inactive'"></app-status-badge>
+          </ng-template>
+        </e-column>
+        <e-column headerText="Actions" width="110" [allowFiltering]="false" [allowSorting]="false">
+          <ng-template #template let-data>
+            <button
+              ejs-button
+              cssClass="e-flat e-primary e-small"
+              class="view-btn"
+              (click)="viewProvider(data.providerId)">
+              View
+            </button>
+          </ng-template>
+        </e-column>
+      </e-columns>
+      <ng-template #detailTemplate let-data>
+        <app-provider-schedule-detail [data]="data"></app-provider-schedule-detail>
+      </ng-template>
+    </ejs-grid>
+  }
+</div>

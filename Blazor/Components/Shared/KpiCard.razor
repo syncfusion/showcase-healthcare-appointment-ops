@@ -1,0 +1,39 @@
+@using HealthcareAppointmentOps.Blazor.Components.Shared
+
+<div class="e-card kpi-card">
+    @if (Icon is not null)
+    {
+        <div class="kpi-card-icon">
+            @Icon
+        </div>
+    }
+    <div class="e-card-header">
+        <div class="e-card-header-caption">
+            <div class="e-card-sub-title kpi-card-title" style="padding-right: @(Icon is not null ? "40px" : "0");">@Title</div>
+        </div>
+    </div>
+    @if (Loading)
+    {
+        <div class="e-card-content" style="margin: 8px 0;">
+            <SfSkeleton Shape="Syncfusion.Blazor.Notifications.SkeletonType.Text" Width="40%" Height="32px" Effect="ShimmerEffect.Wave" />
+        </div>
+    }
+    else
+    {
+        <div class="e-card-content kpi-card-value">@Value</div>
+    }
+    <div class="e-card-actions kpi-card-footer">
+        @if (!Loading && !string.IsNullOrEmpty(Subtitle))
+        {
+            <span class="kpi-card-subtitle">@Subtitle</span>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public RenderFragment? Icon { get; set; }
+}

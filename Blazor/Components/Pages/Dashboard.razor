@@ -1,0 +1,465 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject AnalyticsService AnalyticsService
+@inject AppointmentService AppointmentService
+@using HealthcareAppointmentOps.Blazor.Components.Shared
+@inject NavigationManager NavigationManager
+@inject ThemeService ThemeService
+@implements IDisposable
+
+<PageTitle>Dashboard | Healthcare Appointment and Patient Operations Portal</PageTitle>
+
+<div class="dashboard-page">
+    @if (HasError)
+    {
+        <ErrorBanner Title="Failed to load dashboard data" Message="@ErrorMessage" OnRetry="LoadAsync" />
+    }
+
+    <div class="dashboard-grid">
+        <div class="dashboard-kpis">
+            <KpiCard Title="Today's Appts" Value="@(KpiData?.TotalAppointments.ToString() ?? "—")" Loading="_loadingKpis" Icon="@AppIcon.CalendarDays(16)" />
+            <KpiCard Title="Completed" Value="@(KpiData?.CompletedAppointments.ToString() ?? "—")" Loading="_loadingKpis" Icon="@AppIcon.UserCheck(16)" />
+            <KpiCard Title="Avg Wait" Value="@(_loadingKpis || KpiData is null ? "—" : $"{KpiData.AverageWaitTimeMinutes}m")" Loading="_loadingKpis" Icon="@AppIcon.Clock(16)" />
+            <KpiCard Title="No-Show Rate" Value="@(_loadingKpis || KpiData is null ? "—" : $"{(KpiData.NoShowRate * 100).ToString("F1")}%")" Loading="_loadingKpis" Icon="@AppIcon.TrendingUp(16)" />
+            <KpiCard Title="Open Waitlist" Value="@(KpiData?.OpenWaitlistCount.ToString() ?? "—")" Loading="_loadingKpis" Icon="@AppIcon.ListChecks(16)" />
+        </div>
+
+        <div class="dashboard-card dashboard-card-span-2">
+            <div class="dashboard-card-title">Appointment Type Mix by Department</div>
+            @if (_loadingVolume)
+            {
+                <LoadingState Inline="true" Label="Loading appointment volume…" />
+            }
+            else if (!string.IsNullOrEmpty(_volumeError))
+            {
+                <ErrorBanner Message="@_volumeError" OnRetry="LoadVolumeAsync" />
+            }
+            else if (VolumeData.Count == 0)
+            {
+                <EmptyState Title="No appointment volume" Description="No appointments in the last 30 days." />
+            }
+            else
+            {
+                <div class="dashboard-chart-fill" style="height: @DashboardChartHeight; min-height: 260px;">
+                    <SfChart @key="@("vol"+ChartThemeKey)" Height="100%" Background="transparent" Theme="@ChartThemeValue">
+                        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" Title="Department"></ChartPrimaryXAxis>
+                        <ChartPrimaryYAxis Title="Share" LabelFormat="{value}%" Minimum="0" Maximum="100" Interval="20"></ChartPrimaryYAxis>
+                        <ChartLegendSettings Visible="true" />
+                        <ChartTooltipSettings Enable="true" />
+                        <ChartSeriesCollection>
+                            @foreach (var s in AppointmentTypeSeries)
+                            {
+                                <ChartSeries DataSource="VolumeData" XName="Department" YName="@s.PropertyName" Name="@s.Label" Type="ChartSeriesType.StackingColumn100" Fill="@s.Color" ColumnWidth="0.6">
+                                    @if (s.PropertyName == AppointmentTypeSeries[^1].PropertyName)
+                                    {
+                                        <ChartCornerRadius TopLeft="6" TopRight="6" />
+                                    }
+                                </ChartSeries>
+                            }
+                        </ChartSeriesCollection>
+                    </SfChart>
+                </div>
+            }
+        </div>
+
+        <div class="dashboard-card dashboard-card-span-2">
+            <div class="dashboard-card-title">Provider Utilization</div>
+            @if (_loadingUtilization)
+            {
+                <LoadingState Inline="true" Label="Loading provider utilization…" />
+            }
+            else if (!string.IsNullOrEmpty(_utilizationError))
+            {
+                <ErrorBanner Message="@_utilizationError" OnRetry="LoadUtilizationAsync" />
+            }
+            else if (UtilizationData.Count == 0)
+            {
+                <EmptyState Title="No utilization data" Description="No appointments in the last 30 days." />
+            }
+            else
+            {
+                <div class="dashboard-chart-fill" style="height: @DashboardChartHeight; min-height: 260px;">
+                    <SfChart @key="@("util"+ChartThemeKey)" Height="100%" Background="transparent" Theme="@ChartThemeValue">
+                        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" Title="Provider"></ChartPrimaryXAxis>
+                        <ChartPrimaryYAxis Maximum="@UtilizationMax" Interval="@UtilizationInterval" Title="Utilization %" LabelFormat="{value}%"></ChartPrimaryYAxis>
+                        <ChartLegendSettings Visible="false" />
+                        <ChartTooltipSettings Enable="true" />
+                        <ChartSeriesCollection>
+                            <ChartSeries DataSource="UtilizationData" XName="Name" YName="Rate" Name="Utilization %" Type="ChartSeriesType.Column" PointColorMapping="Color" ColumnWidth="0.6">
+                                <ChartCornerRadius TopLeft="6" TopRight="6" />
+                            </ChartSeries>
+                        </ChartSeriesCollection>
+                    </SfChart>
+                </div>
+            }
+        </div>
+
+        <div class="dashboard-card dashboard-card-span-4 dashboard-card-no-padding">
+            <div class="dashboard-card-title" style="margin-bottom: 0; padding: 16px 20px; border-bottom: @(_upcomingItems.Count > 0 ? "1px solid var(--color-sf-border-secondary)" : "none");">Today's Appointments</div>
+            @if (_loadingUpcoming)
+            {
+                <LoadingState Inline="true" Label="Loading upcoming appointments…" />
+            }
+            else if (!string.IsNullOrEmpty(_upcomingError))
+            {
+                <div style="padding: 20px;">
+                    <ErrorBanner Message="@_upcomingError" OnRetry="LoadUpcomingAsync" />
+                </div>
+            }
+            else if (_upcomingItems.Count == 0)
+            {
+                <div style="padding: 20px;">
+                    <EmptyState Title="No appointments today" Description="Today's appointments will appear here." />
+                </div>
+            }
+            else
+            {
+                <div style="max-height: clamp(340px, calc(100vh - 640px), 640px); overflow: auto;">
+                    <SfListView TData="UpcomingItem" DataSource="_upcomingItems" CssClass="dashboard-upcoming-list">
+                        <ListViewFieldSettings TValue="UpcomingItem" Id="AppointmentId" Text="PatientName"></ListViewFieldSettings>
+                        <ListViewTemplates TValue="UpcomingItem">
+                            <Template>
+                                @{
+                                    var item = context;
+                                    <div class="upcoming-row" style="--status-fg: @item.StatusFg; --status-bg: @item.StatusBg;">
+                                        <span class="upcoming-rail"></span>
+                                        <div class="upcoming-avatar">@item.Initials</div>
+                                        <div class="upcoming-body">
+                                            <div class="upcoming-name-line">
+                                                <span class="upcoming-name">@item.PatientName</span>
+                                                <span class="upcoming-type">@item.AppointmentType</span>
+                                            </div>
+                                            <div class="upcoming-provider">@item.ProviderName</div>
+                                        </div>
+                                        <div class="upcoming-meta">
+                                            <div class="upcoming-time">
+                                                <span class="upcoming-time-value">@item.Time</span>
+                                                <span class="upcoming-time-day">@item.Day</span>
+                                            </div>
+                                            <span class="upcoming-status-pill">@item.StatusLabel</span>
+                                        </div>
+                                    </div>
+                                }
+                            </Template>
+                        </ListViewTemplates>
+                    </SfListView>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _loadingKpis;
+    private bool _loadingVolume;
+    private bool _loadingUtilization;
+    private bool _loadingUpcoming;
+    private string? _volumeError;
+    private string? _utilizationError;
+    private string? _upcomingError;
+
+    private DashboardKpiDto? KpiData { get; set; }
+    private List<VolumeRow> VolumeData { get; set; } = new();
+    private List<UtilizationRow> UtilizationData { get; set; } = new();
+    private List<UpcomingItem> _upcomingItems { get; set; } = new();
+
+    private static readonly string[] UpcomingStatuses = { "Scheduled", "Confirmed", "CheckedIn", "InProgress", "Completed" };
+
+    private static readonly ChartPalette.AppointmentTypeSeriesItem[] AppointmentTypeSeries =
+        ChartPalette.AppointmentTypeSeries;
+
+    private double VolumeMax => NiceAxisMax(VolumeData.Select(d => d.Total));
+    private double VolumeInterval => VolumeMax / 5;
+
+    private double UtilizationMax => NiceAxisMax(UtilizationData.Select(d => (double)d.Rate));
+    private double UtilizationInterval => UtilizationMax / 5;
+
+    private bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+    private string ErrorMessage =>
+        string.IsNullOrEmpty(_upcomingError) ? _kpisError ?? _volumeError ?? _utilizationError ?? string.Empty :
+        string.IsNullOrEmpty(_kpisError) ? _upcomingError :
+        $"{_kpisError} {_upcomingError}";
+    private string? _kpisError;
+
+    private Syncfusion.Blazor.Theme ChartThemeValue => ChartTheme.Resolve(ThemeService.Resolved);
+    private string ChartThemeKey => ChartTheme.KeyFor(ThemeService.Resolved);
+
+    protected override async Task OnInitializedAsync()
+    {
+        ThemeService.OnChange += OnThemeChanged;
+        await LoadAsync();
+    }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => ThemeService.OnChange -= OnThemeChanged;
+
+    private async Task LoadAsync()
+    {
+        await Task.WhenAll(
+            LoadKpisAsync(),
+            LoadUpcomingAsync(),
+            LoadVolumeAsync(),
+            LoadUtilizationAsync());
+    }
+
+    private async Task LoadKpisAsync()
+    {
+        _loadingKpis = true;
+        _kpisError = null;
+        try
+        {
+            var result = await AnalyticsService.GetDashboardKpisAsync();
+            if (result.IsOk)
+                KpiData = result.Data;
+            else
+                _kpisError = result.Error?.Title ?? "Failed to load KPIs.";
+        }
+        catch (Exception ex)
+        {
+            _kpisError = ex.Message;
+        }
+        _loadingKpis = false;
+    }
+
+    private async Task LoadUpcomingAsync()
+    {
+        _loadingUpcoming = true;
+        _upcomingError = null;
+        try
+        {
+            var now = DateTime.UtcNow;
+            var result = await AppointmentService.GetAppointmentsAsync(
+                new AppointmentFilterRequest
+                {
+                    FromDate = DateRangeUtils.ToIsoString(now.Date),
+                    ToDate = DateRangeUtils.ToEndOfDayIso(now),
+                },
+                new PagingRequest { Offset = 0, Limit = 200 });
+
+            if (result.IsOk)
+            {
+                _upcomingItems = result.Data?.Items
+                    .Where(a => UpcomingStatuses.Contains(a.Status.ToString(), StringComparer.OrdinalIgnoreCase))
+                    .OrderBy(a => DateTime.Parse(a.ScheduledDateTime))
+                    .Take(12)
+                    .Select(MapUpcoming)
+                    .ToList() ?? new();
+            }
+            else
+            {
+                _upcomingError = result.Error?.Title ?? "Failed to load upcoming appointments.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _upcomingError = ex.Message;
+        }
+        _loadingUpcoming = false;
+    }
+
+    private async Task LoadVolumeAsync()
+    {
+        _loadingVolume = true;
+        _volumeError = null;
+        try
+        {
+            var (start, end) = RangeDates();
+            var result = await AnalyticsService.GetAppointmentVolumeAsync(start, end);
+            if (result.IsOk)
+            {
+                var byDept = new Dictionary<string, VolumeRow>(StringComparer.OrdinalIgnoreCase);
+                foreach (var d in result.Data ?? new List<VolumeDataPointDto>())
+                {
+                    if (!byDept.TryGetValue(d.DepartmentName, out var row))
+                    {
+                        row = new VolumeRow { Department = d.DepartmentName };
+                        byDept[d.DepartmentName] = row;
+                    }
+                    row.Add(d.AppointmentType, d.Count);
+                }
+                VolumeData = byDept.Values
+                    .OrderByDescending(d => d.Total)
+                    .ToList();
+            }
+            else
+            {
+                _volumeError = result.Error?.Title ?? "Failed to load appointment volume.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _volumeError = ex.Message;
+        }
+        _loadingVolume = false;
+    }
+
+    private async Task LoadUtilizationAsync()
+    {
+        _loadingUtilization = true;
+        _utilizationError = null;
+        try
+        {
+            var (start, end) = RangeDates();
+            var result = await AnalyticsService.GetProviderUtilizationAsync(start, end);
+            if (result.IsOk)
+            {
+                var byProvider = new Dictionary<string, UtilizationRow>(StringComparer.OrdinalIgnoreCase);
+                foreach (var d in result.Data ?? new List<UtilizationDataPointDto>())
+                {
+                    if (!byProvider.TryGetValue(d.ProviderName, out var row))
+                    {
+                        row = new UtilizationRow { Name = d.ProviderName };
+                        byProvider[d.ProviderName] = row;
+                    }
+                    row.Appointments += d.AppointmentCount;
+                    row.Slots += d.TotalSlots;
+                }
+                UtilizationData = byProvider.Values
+                    .Select(p => new UtilizationRow
+                    {
+                        Name = p.Name,
+                        Rate = p.Slots > 0 ? (int)Math.Round(100.0 * p.Appointments / p.Slots) : 0
+                    })
+                    .OrderByDescending(p => p.Rate)
+                    .Take(8)
+                    .Select((p, i) => new UtilizationRow { Name = p.Name, Rate = p.Rate, Color = ChartPalette.BarRamp[i % ChartPalette.BarRamp.Length] })
+                    .ToList();
+            }
+            else
+            {
+                _utilizationError = result.Error?.Title ?? "Failed to load provider utilization.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _utilizationError = ex.Message;
+        }
+        _loadingUtilization = false;
+    }
+
+    private static UpcomingItem MapUpcoming(AppointmentSummaryDto a)
+    {
+        var dt = DateTime.Parse(a.ScheduledDateTime);
+        var status = a.Status.ToString();
+        var style = StatusStyle(status);
+        return new UpcomingItem
+        {
+            AppointmentId = a.AppointmentId,
+            PatientName = a.PatientName,
+            AppointmentType = a.AppointmentType,
+            ProviderName = a.ProviderName,
+            Initials = InitialsOf(a.PatientName),
+            StatusLabel = style.Label,
+            StatusFg = style.Fg,
+            StatusBg = style.Bg,
+            Time = DateFormats.FormatTime(dt),
+            Day = RelativeDay(dt)
+        };
+    }
+
+    private static (string Fg, string Bg, string Label) StatusStyle(string status) => status switch
+    {
+        "Scheduled" => ("var(--color-sf-cyan-700)", "var(--color-sf-cyan-50)", "Scheduled"),
+        "Confirmed" => ("var(--color-sf-success-700)", "var(--color-sf-success-50)", "Confirmed"),
+        "CheckedIn" => ("var(--color-sf-brand-700)", "var(--color-sf-brand-50)", "Checked In"),
+        "InProgress" => ("var(--color-sf-warning-700)", "var(--color-sf-warning-50)", "In Progress"),
+        "Completed" => ("var(--color-sf-fg-secondary)", "var(--color-sf-bg-tertiary)", "Completed"),
+        _ => ("var(--color-sf-fg-tertiary)", "var(--color-sf-bg-tertiary)", status)
+    };
+
+    private static string InitialsOf(string name)
+    {
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var first = parts.FirstOrDefault()? [0] ?? '\0';
+        var last = parts.Length > 1 ? parts[^1][0] : '\0';
+        return (char.ToUpperInvariant(first).ToString() + (last != '\0' ? char.ToUpperInvariant(last).ToString() : "")).Trim();
+    }
+
+    private static string RelativeDay(DateTime dt)
+    {
+        var today = DateTime.Today;
+        var diff = (dt.Date - today).Days;
+        return diff switch
+        {
+            0 => "Today",
+            1 => "Tomorrow",
+            _ => dt.ToString("MMM d")
+        };
+    }
+
+    private static (string Start, string End) RangeDates()
+    {
+        var end = DateTime.UtcNow;
+        var start = end.AddDays(-30);
+        return (start.ToString("yyyy-MM-dd"), end.ToString("yyyy-MM-dd"));
+    }
+
+    private string DashboardChartHeight
+        => "clamp(260px, calc(100vh - 560px), 620px)";
+
+    private static double NiceAxisMax(IEnumerable<double> values)
+    {
+        var max = Math.Max(0, values.DefaultIfEmpty(0).Max());
+        if (max <= 0) return 10;
+        var padded = max * 1.02;
+        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(padded)));
+        var norm = padded / magnitude;
+        var nice = new[] { 1.0, 2.0, 2.5, 5.0, 10.0 }.FirstOrDefault(s => s >= norm);
+        if (nice == 0) nice = 10;
+        return nice * magnitude;
+    }
+
+    private class VolumeRow
+    {
+        public string Department { get; set; } = string.Empty;
+        public double NewPatient { get; set; }
+        public double FollowUp { get; set; }
+        public double AnnualPhysical { get; set; }
+        public double UrgentCare { get; set; }
+        public double Consultation { get; set; }
+        public double Procedure { get; set; }
+        public double LabReview { get; set; }
+        public double Telehealth { get; set; }
+
+        public double Total => NewPatient + FollowUp + AnnualPhysical + UrgentCare
+            + Consultation + Procedure + LabReview + Telehealth;
+
+        public void Add(string appointmentType, double count)
+        {
+            switch (appointmentType)
+            {
+                case "New Patient": NewPatient += count; break;
+                case "Follow-Up": FollowUp += count; break;
+                case "Annual Physical": AnnualPhysical += count; break;
+                case "Urgent Care": UrgentCare += count; break;
+                case "Consultation": Consultation += count; break;
+                case "Procedure": Procedure += count; break;
+                case "Lab Review": LabReview += count; break;
+                case "Telehealth": Telehealth += count; break;
+            }
+        }
+    }
+
+    private class UtilizationRow
+    {
+        public string Name { get; set; } = string.Empty;
+        public int Rate { get; set; }
+        public int Appointments { get; set; }
+        public int Slots { get; set; }
+        public string Color { get; set; } = string.Empty;
+    }
+
+    private class UpcomingItem
+    {
+        public string AppointmentId { get; set; } = string.Empty;
+        public string PatientName { get; set; } = string.Empty;
+        public string AppointmentType { get; set; } = string.Empty;
+        public string ProviderName { get; set; } = string.Empty;
+        public string Initials { get; set; } = string.Empty;
+        public string StatusLabel { get; set; } = string.Empty;
+        public string StatusFg { get; set; } = string.Empty;
+        public string StatusBg { get; set; } = string.Empty;
+        public string Time { get; set; } = string.Empty;
+        public string Day { get; set; } = string.Empty;
+    }
+}

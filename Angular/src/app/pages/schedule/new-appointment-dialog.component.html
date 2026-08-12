@@ -1,0 +1,147 @@
+<ejs-dialog
+  [visible]="visible"
+  header="New Appointment"
+  [showCloseIcon]="true"
+  (close)="onClose.emit()"
+  width="600px"
+  [isModal]="true"
+  [buttons]="dialogButtons()">
+  <div class="dialog-body">
+    <div>
+      <label class="field-label">Patient *</label>
+    </div>
+    <ejs-autocomplete
+      [dataSource]="patients()"
+      [fields]="patientFields"
+      placeholder="Search by name or MRN"
+      [minLength]="2"
+      [suggestionCount]="10"
+      [allowFiltering]="true"
+      noRecordsTemplate="No patients found"
+      filterType="Contains"
+      [ignoreCase]="true"
+      [sortOrder]="'Ascending'"
+      (filtering)="onPatientFiltering($event)"
+      (select)="onPatientSelect($event)">
+    </ejs-autocomplete>
+    @if (errors().patient) {
+      <app-form-field-error [message]="errors().patient!"></app-form-field-error>
+    }
+
+    <div class="grid-2">
+      <div>
+        <label class="field-label">Department *</label>
+        <ejs-dropdownlist
+          [dataSource]="departmentOptions()"
+          [fields]="departmentFields"
+          placeholder="Select department"
+          [sortOrder]="'Ascending'"
+          (change)="onDepartmentChange($event)">
+        </ejs-dropdownlist>
+        @if (errors().department) {
+          <app-form-field-error [message]="errors().department!"></app-form-field-error>
+        }
+      </div>
+      <div>
+        <label class="field-label">Location *</label>
+        <ejs-dropdownlist
+          [dataSource]="locations()"
+          [fields]="locationFields"
+          placeholder="Select location"
+          [value]="locationId()"
+          [enabled]="!!departmentId()"
+          [sortOrder]="'Ascending'"
+          (change)="onLocationChange($event)">
+        </ejs-dropdownlist>
+        @if (errors().location) {
+          <app-form-field-error [message]="errors().location!"></app-form-field-error>
+        }
+      </div>
+    </div>
+
+    <div>
+      <label class="field-label">Provider *</label>
+      <ejs-autocomplete
+        [dataSource]="filteredProviders()"
+        [fields]="providerFields"
+        [placeholder]="departmentId() ? 'Select provider' : 'Select a department first'"
+        [value]="providerId()"
+        [enabled]="!!departmentId()"
+        [allowCustom]="false"
+        [sortOrder]="'Ascending'"
+        (filtering)="onProviderFiltering($event)"
+        (change)="onProviderSelect($event)">
+      </ejs-autocomplete>
+      @if (errors().provider) {
+        <app-form-field-error [message]="errors().provider!"></app-form-field-error>
+      }
+    </div>
+
+    <div class="grid-3">
+      <div>
+        <label class="field-label">Date & Time *</label>
+        <ejs-datetimepicker
+          [value]="scheduledDateTime() ?? undefined"
+          (change)="onDateTimeChange($event)"
+          width="100%">
+        </ejs-datetimepicker>
+        @if (errors().scheduledDateTime) {
+          <app-form-field-error [message]="errors().scheduledDateTime!"></app-form-field-error>
+        }
+        @if (conflictError()) {
+          <app-form-field-error [message]="conflictError()!"></app-form-field-error>
+        }
+      </div>
+      <div>
+        <label class="field-label">Duration (min) *</label>
+        <ejs-dropdownlist
+          [dataSource]="durationOptions"
+          [fields]="durationFields"
+          placeholder="Duration"
+          [value]="durationMinutes()"
+          [sortOrder]="'Ascending'"
+          (change)="onDurationChange($event)">
+        </ejs-dropdownlist>
+      </div>
+      <div>
+        <label class="field-label">Type *</label>
+        <ejs-dropdownlist
+          [dataSource]="appointmentTypeOptions"
+          placeholder="Appointment type"
+          [value]="appointmentType()"
+          [sortOrder]="'Ascending'"
+          (change)="onTypeChange($event)">
+        </ejs-dropdownlist>
+        @if (errors().appointmentType) {
+          <app-form-field-error [message]="errors().appointmentType!"></app-form-field-error>
+        }
+      </div>
+    </div>
+
+    <div>
+      <label class="field-label">Reason for Visit *</label>
+      <ejs-textbox
+        placeholder="Enter reason for visit"
+        [value]="reasonForVisit()"
+        [multiline]="true"
+        width="100%"
+        (input)="onReasonChange($any($event).value)"
+        (blur)="onReasonBlur()">
+      </ejs-textbox>
+      @if (errors().reasonForVisit) {
+        <app-form-field-error [message]="errors().reasonForVisit!"></app-form-field-error>
+      }
+    </div>
+
+    <div>
+      <label class="field-label">Notes</label>
+      <ejs-textbox
+        placeholder="Additional notes"
+        [value]="notes()"
+        [multiline]="true"
+        width="100%"
+        (input)="onNotesChange($any($event).value)">
+      </ejs-textbox>
+    </div>
+  </div>
+</ejs-dialog>

@@ -1,0 +1,8 @@
+<div class="skeleton-shimmer" aria-hidden="true" style="width: @Width; height: @Height; border-radius: @Radius; @Style"></div>
+
+@code {
+    [Parameter] public string Width { get; set; } = "100%";
+    [Parameter] public string Height { get; set; } = "16px";
+    [Parameter] public string Radius { get; set; } = "4px";
+    [Parameter] public string? Style { get; set; }
+}

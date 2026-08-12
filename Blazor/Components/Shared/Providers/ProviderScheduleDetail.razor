@@ -1,0 +1,129 @@
+
+@using Syncfusion.Blazor.Grids
+@inject ProviderService ProviderService
+
+<div class="provider-schedule-detail">
+    <div class="provider-schedule-detail-title">Weekly Availability</div>
+    <div class="provider-schedule-detail-subtitle">Recurring schedule templates for this provider.</div>
+
+    @if (_loading)
+    {
+        <LoadingState Inline="true" Label="Loading templates…" />
+    }
+    else if (!string.IsNullOrEmpty(_error))
+    {
+        <ErrorBanner Message="@_error" OnRetry="LoadTemplatesAsync" />
+    }
+    else if (_templates.Count == 0)
+    {
+        <EmptyState Title="No templates" Description="This provider has no schedule templates yet." />
+    }
+    else
+    {
+        <SfGrid TValue="ScheduleTemplateDto"
+                DataSource="@_templates"
+                AllowSorting="true">
+            <GridColumns>
+                <GridColumn Field="@nameof(ScheduleTemplateDto.DayOfWeek)" HeaderText="Day" Width="90">
+                    <Template>
+                        @{
+                            var t = (ScheduleTemplateDto)context;
+                        }
+                        <span>@DayLabel(t.DayOfWeek)</span>
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(ScheduleTemplateDto.StartTime)" HeaderText="Start" Width="100">
+                    <Template>
+                        @{
+                            var t = (ScheduleTemplateDto)context;
+                        }
+                        <span>@FormatTime12h(t.StartTime)</span>
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(ScheduleTemplateDto.EndTime)" HeaderText="End" Width="100">
+                    <Template>
+                        @{
+                            var t = (ScheduleTemplateDto)context;
+                        }
+                        <span>@FormatTime12h(t.EndTime)</span>
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(ScheduleTemplateDto.SlotDuration)" HeaderText="Slot (min)" Width="100" />
+                <GridColumn Field="@nameof(ScheduleTemplateDto.EffectiveFrom)" HeaderText="From" Width="120">
+                    <Template>
+                        @{
+                            var t = (ScheduleTemplateDto)context;
+                        }
+                        <span>@DateFormats.FormatDate(t.EffectiveFrom)</span>
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(ScheduleTemplateDto.EffectiveTo)" HeaderText="To" Width="120">
+                    <Template>
+                        @{
+                            var t = (ScheduleTemplateDto)context;
+                        }
+                        <span>@(string.IsNullOrEmpty(t.EffectiveTo) ? "Ongoing" : DateFormats.FormatDate(t.EffectiveTo))</span>
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(ScheduleTemplateDto.IsActive)" HeaderText="Active" Width="90" DisplayAsCheckBox="true" />
+            </GridColumns>
+        </SfGrid>
+    }
+</div>
+
+@code {
+    [Parameter] public string ProviderId { get; set; } = string.Empty;
+
+    private List<ScheduleTemplateDto> _templates = new();
+    private bool _loading;
+    private string? _error;
+
+    private static readonly string[] DayLabels =
+        { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadTemplatesAsync();
+    }
+
+    private async Task LoadTemplatesAsync()
+    {
+        if (string.IsNullOrEmpty(ProviderId)) return;
+
+        _loading = true;
+        _error = null;
+        try
+        {
+            var res = await ProviderService.GetScheduleTemplatesAsync(ProviderId);
+            if (res.IsOk && res.Data is not null)
+            {
+                _templates = res.Data
+                    .OrderBy(t => t.DayOfWeek)
+                    .ThenBy(t => t.StartTime)
+                    .ToList();
+            }
+            else
+            {
+                _error = res.Error?.Title ?? "Failed to load schedule templates.";
+                _templates = new();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _templates = new();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string DayLabel(int dayOfWeek) =>
+        dayOfWeek >= 0 && dayOfWeek < DayLabels.Length ? DayLabels[dayOfWeek] : dayOfWeek.ToString();
+
+    private static string FormatTime12h(string? value)
+    {
+        return DateFormats.FormatTime(value);
+    }
+}

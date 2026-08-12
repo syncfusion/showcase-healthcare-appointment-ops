@@ -1,0 +1,514 @@
+@page "/schedule"
+@rendermode InteractiveServer
+@using HealthcareAppointmentOps.Blazor.Components.Shared
+@using HealthcareAppointmentOps.Blazor.Models.Dtos
+@using HealthcareAppointmentOps.Blazor.Services
+@using Syncfusion.Blazor.Schedule
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Buttons
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Schedule | Healthcare Appointment and Patient Operations Portal</PageTitle>
+
+<div class="schedule-page">
+    <div class="schedule-toolbar">
+        <div class="schedule-toolbar-group">
+            <SfDropDownList TValue="string"
+                            TItem="DepartmentDto"
+                            @key="@($"dept-ddl-{_departments.Count}")"
+                            Placeholder="All Departments"
+                            DataSource="@_departments"
+                            AllowFiltering="true"
+                            Value="@_departmentFilter"
+                            SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending"
+                            ShowClearButton="true"
+                            Width="200px"
+                            CssClass="schedule-filter dept-group-ddl">
+                <DropDownListFieldSettings Text="DepartmentName" Value="DepartmentId" GroupBy="LocationName" />
+                <DropDownListEvents TValue="string" TItem="DepartmentDto" ValueChange="OnDepartmentFilterChange" />
+            </SfDropDownList>
+
+            <SfDropDownList TValue="string"
+                            TItem="ProviderSummaryDto"
+                            Placeholder="All Providers"
+                            DataSource="@_filteredProviders"
+                            AllowFiltering="true"
+                            Value="@_providerFilter"
+                            SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending"
+                            ShowClearButton="true"
+                            Width="200px"
+                            CssClass="schedule-filter">
+                <DropDownListFieldSettings Text="LastName" Value="ProviderId" />
+                <DropDownListTemplates TItem="ProviderSummaryDto">
+                    <ItemTemplate Context="provider">
+                        <span>@($"Dr. {provider.FirstName} {provider.LastName}")</span>
+                    </ItemTemplate>
+                </DropDownListTemplates>
+                <DropDownListEvents TValue="string" TItem="ProviderSummaryDto" ValueChange="OnProviderFilterChange" />
+            </SfDropDownList>
+            <SfButton CssClass="e-primary"
+                      IconCss="e-icons e-plus"
+                      OnClick="@(() => OpenNewAppointment(null, _providerFilter))">
+                New Appointment
+            </SfButton>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(DataError))
+    {
+        <ErrorBanner Title="Schedule data could not be loaded"
+                     Message="Schedule data could not be loaded — showing an empty planner. Click Retry to attempt loading again."
+                     OnRetry="RefreshAllAsync" />
+    }
+
+    @if (_scheduleLoading)
+    {
+        <LoadingState Label="Loading schedule…" />
+    }
+    else
+    {
+        <div class="schedule-shell">
+                <SfSchedule TValue="ScheduleEventData"
+                            @ref="ScheduleRef"
+                            @key="@($"schedule-{_groupByDate}-{_resourceDataSource.Count}")"
+                            Height="100%"
+                            SelectedDate="@_selectedDate"
+                            CurrentView="@_currentView"
+                            AllowDragAndDrop="true"
+                            AllowResizing="true"
+                            Timezone="UTC"
+                            StartHour="08:00"
+                            EndHour="18:00"
+                            ShowQuickInfo="false"
+                            EnableAdaptiveUI="@IsMobile"
+                            CssClass="health-ops-schedule">
+                    <ScheduleWorkHours Highlight="true" Start="08:00" End="17:00" />
+                @if (_groupByDate)
+                {
+                    <ScheduleGroup ByDate="true" Resources="@(new[] { "Providers" })" />
+                }
+                <ScheduleResources>
+                    <ScheduleResource TItem="ProviderResource"
+                                      TValue="string"
+                                      DataSource="@_resourceDataSource"
+                                      Field="ProviderId"
+                                      Title="Provider"
+                                      Name="Providers"
+                                      TextField="Text"
+                                      IdField="Id"
+                                      AllowMultiple="false" />
+                </ScheduleResources>
+                <ScheduleEventSettings DataSource="@_events" TValue="ScheduleEventData">
+                    <ScheduleField Id="Id">
+                        <FieldSubject Name="Subject"></FieldSubject>
+                        <FieldStartTime Name="StartTime"></FieldStartTime>
+                        <FieldEndTime Name="EndTime"></FieldEndTime>
+                    </ScheduleField>
+                </ScheduleEventSettings>
+                <ScheduleEvents TValue="ScheduleEventData"
+                                EventRendered="OnEventRendered"
+                                ActionCompleted="OnActionCompleted"
+                                Navigating="OnNavigating"
+                                OnCellDoubleClick="OnCellDoubleClick"
+                                OnEventClick="OnEventClick"
+                                OnEventDoubleClick="OnEventDoubleClick" />
+                <ScheduleViews>
+                    <ScheduleView Option="View.Day" />
+                    <ScheduleView Option="View.WorkWeek" />
+                    <ScheduleView Option="View.Month" />
+                    <ScheduleView Option="View.Agenda" />
+                    <ScheduleView Option="View.TimelineWeek" />
+                </ScheduleViews>
+                </SfSchedule>
+        </div>
+    }
+</div>
+
+@if (_dialogVisible)
+{
+    <NewAppointmentDialog @ref="_dialog"
+                          Visible="true"
+                          InitialDateTime="_dialogDateTime"
+                          InitialProviderId="@_dialogProviderId"
+                          Providers="@_filteredProviders"
+                          Departments="@_departments"
+                          OnClose="CloseNewAppointment"
+                          OnSubmit="HandleDialogSubmitAsync" />
+}
+
+@if (_detailPanelOpen)
+{
+    <AppointmentDetailPanel IsOpen="true"
+                            AppointmentId="@_detailPanelAppointmentId"
+                            OnClose="CloseDetailPanel"
+                            OnChanged="RefreshAppointmentsAsync" />
+}
+
+@code {
+    [Inject] private AppointmentService AppointmentService { get; set; } = default!;
+    [Inject] private ProviderService ProviderService { get; set; } = default!;
+    [Inject] private ReferenceDataService ReferenceDataService { get; set; } = default!;
+    [Inject] private ILogger<Schedule> Logger { get; set; } = default!;
+
+    private SfSchedule<ScheduleEventData>? ScheduleRef;
+    private NewAppointmentDialog? _dialog;
+
+    private DateTime _selectedDate = DateTime.Today;
+    private string _departmentFilter = string.Empty;
+    private string _providerFilter = string.Empty;
+    private View _currentView = View.WorkWeek;
+
+    private List<DepartmentDto> _departments = new();
+    private List<ProviderSummaryDto> _providers = new();
+    private List<ProviderSummaryDto> _filteredProviders = new();
+    private List<ProviderResource> _resourceDataSource = new();
+    private List<ScheduleEventData> _events = new();
+    private List<ScheduleEventData>? _refreshedEvents;
+    private bool _groupByDate;
+
+    private bool _isLoadingAppointments;
+
+    private bool _scheduleLoading = true;
+    private string DataError { get; set; } = string.Empty;
+    private int _refreshTick;
+
+    private bool IsMobile;
+    private DotNetObjectReference<Schedule>? _selfRef;
+
+    private bool _dialogVisible;
+    private DateTime? _dialogDateTime;
+    private string? _dialogProviderId;
+    private bool _detailPanelOpen;
+    private string? _detailPanelAppointmentId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllAsync();
+    }
+
+    private async Task LoadAllAsync()
+    {
+        _scheduleLoading = true;
+        DataError = string.Empty;
+        try
+        {
+            var departmentsTask = ReferenceDataService.GetDepartmentsAsync();
+            var providersTask = ProviderService.GetProvidersAsync();
+            await Task.WhenAll(departmentsTask, providersTask);
+
+            _departments = departmentsTask.Result.IsOk ? departmentsTask.Result.Data ?? new() : new();
+            _providers = providersTask.Result.IsOk ? providersTask.Result.Data ?? new() : new();
+
+            if (string.IsNullOrEmpty(_departmentFilter) && _departments.Count > 0)
+                _departmentFilter = _departments[0].DepartmentId;
+
+            ApplyProviderFilter();
+
+            var firstError =
+                (!departmentsTask.Result.IsOk ? departmentsTask.Result.Error?.Title ?? "Departments failed to load" : null) ??
+                (!providersTask.Result.IsOk ? providersTask.Result.Error?.Title ?? "Providers failed to load" : null);
+            if (firstError is not null)
+                DataError = firstError;
+        }
+        catch (Exception ex)
+        {
+            DataError = ex.Message;
+        }
+        finally
+        {
+            _scheduleLoading = false;
+        }
+
+        await LoadAppointmentsAsync();
+    }
+
+    private async Task LoadAppointmentsAsync()
+    {
+        _isLoadingAppointments = true;
+        try
+        {
+            var (rangeStart, rangeEnd) = ComputeVisibleRange(_selectedDate, _currentView);
+            var filter = new AppointmentFilterRequest
+            {
+                FromDate = DateRangeUtils.ToIsoString(rangeStart),
+                ToDate = DateRangeUtils.ToEndOfDayIso(rangeEnd),
+            };
+            if (!string.IsNullOrEmpty(_providerFilter))
+                filter.ProviderId = _providerFilter;
+            if (!string.IsNullOrEmpty(_departmentFilter))
+                filter.DepartmentId = _departmentFilter;
+
+            var result = await AppointmentService.GetAppointmentsAsync(
+                filter,
+                new PagingRequest { Offset = 0, Limit = 500 });
+
+            if (result.IsOk && result.Data is not null)
+            {
+                _events = result.Data.Items
+                    .Select(dto => ScheduleEventData.FromDto(dto, _providerFilter))
+                    .ToList();
+            }
+            else
+            {
+                _events = new();
+                if (!string.IsNullOrEmpty(result.Error?.Title))
+                    DataError = result.Error.Title;
+            }
+        }
+        catch (Exception ex)
+        {
+            DataError = ex.Message;
+        }
+        finally
+        {
+            _isLoadingAppointments = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                IsMobile = await JS.InvokeAsync<bool>("healthOpsMedia.isMobile");
+            }
+            catch
+            {
+                IsMobile = false;
+            }
+            try
+            {
+                _selfRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("healthOpsMedia.registerResizeListener", _selfRef);
+            }
+            catch
+            {
+                // best-effort; CSS media query rules still cover the layout.
+            }
+            StateHasChanged();
+        }
+
+        if (ScheduleRef is not null && !ReferenceEquals(_refreshedEvents, _events))
+        {
+            _refreshedEvents = _events;
+            try
+            {
+                await ScheduleRef.RefreshEventsAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to refresh schedule events.");
+            }
+            finally
+            {
+                _isLoadingAppointments = false;
+            }
+        }
+    }
+
+    [JSInvokable]
+    public void OnViewportResized(bool isMobile)
+    {
+        if (IsMobile == isMobile) return;
+        IsMobile = isMobile;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        _selfRef?.Dispose();
+        _selfRef = null;
+    }
+
+    private async Task RefreshAppointmentsAsync()
+    {
+        await LoadAppointmentsAsync();
+        StateHasChanged();
+    }
+
+    private async Task RefreshAllAsync()
+    {
+        _refreshTick++;
+        await LoadAllAsync();
+    }
+
+    private void OnNavigating(NavigatingEventArgs args)
+    {
+        if (args.ActionType == ActionType.DateNavigate && args.CurrentDate is DateTime newDate)
+        {
+            _selectedDate = newDate;
+            _ = LoadAppointmentsAsync().ContinueWith(_ => InvokeAsync(StateHasChanged));
+        }
+        else if (args.ActionType == ActionType.ViewNavigate)
+        {
+            _currentView = args.CurrentView;
+            _ = LoadAppointmentsAsync().ContinueWith(_ => InvokeAsync(StateHasChanged));
+        }
+    }
+
+    private static (DateTime start, DateTime end) ComputeVisibleRange(DateTime anchor, View view)
+    {
+        return view switch
+        {
+            View.Month => (new DateTime(anchor.Year, anchor.Month, 1).AddDays(-7),
+                           new DateTime(anchor.Year, anchor.Month, 1).AddMonths(1).AddDays(7).AddTicks(-1)),
+            _ => (DateRangeUtils.StartOfWeek(anchor), DateRangeUtils.EndOfWeek(anchor)),
+        };
+    }
+
+    private async Task OnDepartmentFilterChange(ChangeEventArgs<string, DepartmentDto> args)
+    {
+        var value = args.Value ?? string.Empty;
+        if (value == _departmentFilter) return;
+        _departmentFilter = value;
+        _providerFilter = string.Empty;
+        await ReloadSchedulerAsync();
+    }
+
+    private async Task OnProviderFilterChange(ChangeEventArgs<string, ProviderSummaryDto> args)
+    {
+        var value = args.Value ?? string.Empty;
+        if (value == _providerFilter) return;
+        _providerFilter = value;
+        await ReloadSchedulerAsync();
+    }
+
+    private async Task ReloadSchedulerAsync()
+    {
+        _scheduleLoading = true;
+        StateHasChanged();
+
+        ApplyProviderFilter();
+        await LoadAppointmentsAsync();
+        StateHasChanged();
+
+        _scheduleLoading = false;
+    }
+
+    private void ApplyProviderFilter()
+    {
+        _filteredProviders = string.IsNullOrEmpty(_departmentFilter)
+            ? _providers
+            : _providers.Where(p => p.DepartmentId == _departmentFilter).ToList();
+        _resourceDataSource = _filteredProviders
+            .Select(p => new ProviderResource
+            {
+                Id = p.ProviderId,
+                Text = $"Dr. {p.FirstName} {p.LastName}",
+                Specialty = p.Specialty,
+            })
+            .ToList();
+
+        _groupByDate = !string.IsNullOrEmpty(_departmentFilter) && string.IsNullOrEmpty(_providerFilter) && _resourceDataSource.Count > 0;
+    }
+
+    private void OnCellDoubleClick(CellClickEventArgs args)
+    {
+        args.Cancel = true;
+        OpenNewAppointment(args.StartTime, _providerFilter);
+    }
+
+    private void OnEventClick(EventClickArgs<ScheduleEventData> args)
+    {
+        args.Cancel = true;
+        var id = args.Event?.Id;
+        if (!string.IsNullOrEmpty(id))
+            OpenDetailPanel(id);
+    }
+
+    private void OnEventDoubleClick(EventClickArgs<ScheduleEventData> args)
+    {
+        args.Cancel = true;
+        var id = args.Event?.Id;
+        if (!string.IsNullOrEmpty(id))
+            OpenDetailPanel(id);
+    }
+
+    private void OnEventRendered(EventRenderedArgs<ScheduleEventData> args)
+    {
+        var data = args.Data;
+        if (data is null) return;
+
+        var classes = new List<string> { "health-ops-event" };
+        if (data.IsReadonly) classes.Add("evt-readonly");
+        classes.Add($"evt-type-{Slugify(data.AppointmentType)}");
+        classes.Add($"evt-status-{data.Status.ToString().ToLowerInvariant()}");
+        args.CssClasses = classes;
+
+        var bg = data.CategoryColor;
+        var text = AppointmentColors.ChooseTextColor(bg);
+        args.Attributes = new Dictionary<string, object>
+        {
+            ["style"] = $"background:{bg};border-color:{bg};color:{text};",
+            ["data-appointment-type"] = data.AppointmentType ?? string.Empty,
+            ["data-status"] = data.Status.ToString(),
+        };
+    }
+
+    private void OnActionCompleted(Syncfusion.Blazor.Schedule.ActionEventArgs<ScheduleEventData> args)
+    {
+        switch (args.ActionType)
+        {
+            case ActionType.EventCreate:
+                if (_isLoadingAppointments)
+                    break;
+                if (args.AddedRecords is { Count: > 0 } && args.AddedRecords[0] is ScheduleEventData ev)
+                {
+                    _dialogDateTime = ev.StartTime;
+                    _dialogProviderId = ev.ProviderId;
+                    _dialogVisible = true;
+                }
+                break;
+            case ActionType.EventChange:
+            case ActionType.EventRemove:
+                _ = LoadAppointmentsAsync().ContinueWith(_ => InvokeAsync(StateHasChanged));
+                break;
+        }
+    }
+
+    private void OpenNewAppointment(DateTime? startTime, string? providerId)
+    {
+        _dialogDateTime = startTime;
+        _dialogProviderId = string.IsNullOrEmpty(providerId) ? _providerFilter : providerId;
+        _dialogVisible = true;
+    }
+
+    private async Task CloseNewAppointment()
+    {
+        _dialogVisible = false;
+        await Task.CompletedTask;
+    }
+
+    private void OpenDetailPanel(string appointmentId)
+    {
+        _detailPanelAppointmentId = appointmentId;
+        _detailPanelOpen = true;
+    }
+
+    private async Task CloseDetailPanel()
+    {
+        _detailPanelOpen = false;
+        await Task.CompletedTask;
+    }
+
+    private async Task HandleDialogSubmitAsync(CreateAppointmentRequest request)
+    {
+        var result = await AppointmentService.CreateAppointmentAsync(request);
+        if (result.IsOk)
+        {
+            _dialogVisible = false;
+            await LoadAppointmentsAsync();
+        }
+    }
+
+    private static string Slugify(string? input)
+    {
+        if (string.IsNullOrEmpty(input)) return "default";
+        var chars = input.ToLowerInvariant()
+            .Select(c => char.IsLetterOrDigit(c) ? c : '-')
+            .ToArray();
+        return new string(chars).Trim('-');
+    }
+}

@@ -1,0 +1,12 @@
+@code {
+    [Parameter] public string FirstName { get; set; } = string.Empty;
+    [Parameter] public string LastName { get; set; } = string.Empty;
+    [Parameter] public int Size { get; set; } = 40;
+    [Parameter] public string Color { get; set; } = "var(--color-sf-bg-brand-solid)";
+
+    private string Initials => $"{(FirstName?.Trim().FirstOrDefault() ?? ' ')}{(LastName?.Trim().FirstOrDefault() ?? ' ')}".Trim().ToUpperInvariant();
+}
+
+<div style="width: @(Size)px; height: @(Size)px; border-radius: 50%; background: @Color; color: var(--color-sf-fg-on-brand-primary); display: flex; align-items: center; justify-content: center; font-size: @(Math.Round(Size * 0.375))px; font-weight: 700; flex-shrink: 0;">
+    @Initials
+</div>

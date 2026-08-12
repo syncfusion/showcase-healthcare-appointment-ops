@@ -1,0 +1,158 @@
+<SfSidebar Width="400px"
+           Position="SidebarPosition.Right"
+           Type="SidebarType.Over"
+           ShowBackdrop="true"
+           CloseOnDocumentClick="false"
+           @bind-IsOpen="IsOpen"
+           CssClass="ai-assist-sidebar">
+    <ChildContent>
+        <div class="ai-sidebar-body">
+            <div class="ai-sidebar-header">
+                <div>
+                    <div class="ai-sidebar-kicker">AI Assist</div>
+                    <div class="ai-sidebar-title">@Title</div>
+                </div>
+                <SfButton CssClass="e-flat e-small" OnClick="@(args => CloseAsync())">✕</SfButton>
+            </div>
+
+            @if (Confidence is not null)
+            {
+                <div class="ai-sidebar-confidence-row">
+                    <span class="ai-sidebar-confidence-label">Confidence</span>
+                    <span class="confidence-pill" style="background: @ConfidenceBg; color: @ConfidenceFg;">
+                        @Math.Round(Confidence.Value * 100)%
+                    </span>
+                    <span class="ai-sidebar-counts">✓ @_acceptedCount accepted · ✕ @_rejectedCount rejected</span>
+                </div>
+            }
+
+            @if (Loading)
+            {
+                <div class="ai-sidebar-loading">
+                    <div class="ai-sidebar-spinner"></div>
+                    <div>Analyzing patient data…</div>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(Error))
+            {
+                <div class="ai-sidebar-error">@Error</div>
+            }
+            else if (!string.IsNullOrEmpty(Summary))
+            {
+                <div class="ai-sidebar-scroll">
+                    <div class="ai-sidebar-summary">
+                        <div class="ai-sidebar-section-label">Summary</div>
+                        <div class="ai-sidebar-summary-text">@Summary</div>
+                    </div>
+
+                    @if (Recommendations.Count > 0)
+                    {
+                        <div>
+                            <div class="ai-sidebar-section-label">Recommendations</div>
+                            <div class="ai-sidebar-rec-list">
+                                @foreach (var rec in Recommendations)
+                                {
+                                    var r = rec;
+                                    @if (r.Accepted)
+                                    {
+                                        <div class="recommendation-card recommendation-card-accepted">
+                                            <div class="recommendation-card-header">
+                                                <span class="recommendation-card-title">✓ @r.Title</span>
+                                                <StatusBadge Status="Completed" />
+                                            </div>
+                                            <div class="recommendation-card-note">Accepted — logged to audit trail</div>
+                                        </div>
+                                    }
+                                    else if (r.Rejected)
+                                    {
+                                        <div class="recommendation-card recommendation-card-rejected">
+                                            <div class="recommendation-card-title">✕ @r.Title</div>
+                                            <div class="recommendation-card-note">Dismissed</div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="recommendation-card">
+                                            <div class="recommendation-card-header">
+                                                <span class="recommendation-card-title">@r.Title</span>
+                                                <StatusBadge Status="@SeverityToBadge(r.Severity)" />
+                                            </div>
+                                            <div class="recommendation-card-rationale">@r.Rationale</div>
+                                            <div class="recommendation-actions">
+                                                <SfButton CssClass="e-primary e-small" OnClick="@(args => Accept(r))">Accept</SfButton>
+                                                <SfButton CssClass="e-flat e-small" OnClick="@(args => Reject(r))">Reject</SfButton>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Explanation))
+                    {
+                        <div class="ai-explanation-footer">@Explanation</div>
+                    }
+                </div>
+            }
+        </div>
+    </ChildContent>
+</SfSidebar>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public string Title { get; set; } = "AI Suggestions";
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public string? Summary { get; set; }
+    [Parameter] public string? Explanation { get; set; }
+    [Parameter] public double? Confidence { get; set; }
+    [Parameter] public List<AiRecommendationModel> Recommendations { get; set; } = new();
+
+    private int _acceptedCount;
+    private int _rejectedCount;
+
+    private string ConfidenceBg =>
+        Confidence >= 0.8 ? "var(--color-sf-bg-success-primary)" :
+        Confidence >= 0.6 ? "var(--color-sf-bg-warning-primary)" : "var(--color-sf-bg-error-primary)";
+
+    private string ConfidenceFg =>
+        Confidence >= 0.8 ? "var(--color-sf-fg-success-primary)" :
+        Confidence >= 0.6 ? "var(--color-sf-fg-warning-primary)" : "var(--color-sf-fg-error-primary)";
+
+    private static string SeverityToBadge(string severity) => severity switch
+    {
+        "Critical" => "Emergency",
+        "Warning" => "Urgent",
+        _ => "Active"
+    };
+
+    private void Accept(AiRecommendationModel rec)
+    {
+        rec.Accepted = true;
+        _acceptedCount++;
+    }
+
+    private void Reject(AiRecommendationModel rec)
+    {
+        rec.Rejected = true;
+        _rejectedCount++;
+    }
+
+    private async Task CloseAsync()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    public class AiRecommendationModel
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Rationale { get; set; } = string.Empty;
+        public string Severity { get; set; } = "Info";
+        public bool Accepted { get; set; }
+        public bool Rejected { get; set; }
+    }
+}

@@ -1,0 +1,46 @@
+<div class="detail">
+  <div class="detail-header">
+    <div>
+      <div class="detail-patient">{{ entry.patientName }}</div>
+      <div class="detail-badges">
+        <app-status-badge [status]="entry.urgencyLevel"></app-status-badge>
+        <app-status-badge [status]="entry.status"></app-status-badge>
+      </div>
+    </div>
+    <button ejs-button cssClass="e-flat e-small" iconCss="e-icons e-close" title="Close" (click)="close.emit()"></button>
+  </div>
+
+  <div class="detail-body">
+    <div class="section-label">Request</div>
+    <div class="row"><span class="row-label">Appointment type</span><span class="row-value">{{ entry.requestedAppointmentType }}</span></div>
+    <div class="row"><span class="row-label">Preferred provider</span><span class="row-value">{{ entry.preferredProviderName ?? 'Any available' }}</span></div>
+    <div class="row"><span class="row-label">Department</span><span class="row-value">{{ entry.preferredDepartmentName }}</span></div>
+    <div class="row"><span class="row-label">Preferred dates</span><span class="row-value">{{ formatDate(entry.preferredDateRangeStart) }} – {{ formatDate(entry.preferredDateRangeEnd) }}</span></div>
+    <div class="row"><span class="row-label">Requested on</span><span class="row-value">{{ formatDate(entry.requestDateTime) }} ({{ waitDays }}d ago)</span></div>
+
+    <div class="section-label section-label--spaced">Priority breakdown</div>
+    <div class="priority-score">
+      <span class="priority-number">{{ entry.priorityScore }}</span>
+      <span class="priority-caption">composite priority score</span>
+    </div>
+
+    <div class="factor-bar">
+      <div class="factor-meta"><span>Urgency</span><span>{{ entry.urgencyLevel }}</span></div>
+      <div class="factor-track"><div class="factor-fill" [style.width.%]="urgencyPct" [style.background]="'var(--color-sf-bg-warning-solid)'"></div></div>
+    </div>
+
+    <div class="factor-bar">
+      <div class="factor-meta"><span>Wait time</span><span>{{ waitDays }} day{{ waitDays === 1 ? '' : 's' }}</span></div>
+      <div class="factor-track"><div class="factor-fill" [style.width.%]="waitPct" [style.background]="'var(--color-sf-bg-brand-solid)'"></div></div>
+    </div>
+
+    @if (entry.matchedAppointmentId) {
+      <div class="matched-note">Matched to appointment {{ entry.matchedAppointmentId }}</div>
+    }
+  </div>
+
+  <div class="detail-footer">
+    <button ejs-button cssClass="e-primary" class="find-btn" [disabled]="!isOpen" (click)="findSlot.emit()">Find Matching Slot</button>
+    <button ejs-button cssClass="e-danger e-outline" [disabled]="removing || !isOpen" (click)="remove.emit()">{{ removing ? 'Removing…' : 'Remove' }}</button>
+  </div>
+</div>

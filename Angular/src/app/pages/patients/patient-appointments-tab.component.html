@@ -1,0 +1,200 @@
+@if (error(); as err) {
+  <app-error-banner [message]="err" (retry)="retryAppointments()"></app-error-banner>
+}
+
+<div class="appt-kpis">
+  <app-kpi-card title="Total" [value]="metrics().total"></app-kpi-card>
+  <app-kpi-card title="Completed" [value]="metrics().completedCount"></app-kpi-card>
+  <app-kpi-card title="No-Shows" [value]="metrics().noShowsCount"></app-kpi-card>
+  <app-kpi-card title="Upcoming" [value]="metrics().upcomingCount"></app-kpi-card>
+</div>
+
+<div class="appt-toolbar">
+  <span class="appt-toolbar-label">Status:</span>
+  <ejs-dropdownlist
+    [dataSource]="statuses"
+    [(value)]="statusFilter"
+    [sortOrder]="'Ascending'"
+    width="200">
+  </ejs-dropdownlist>
+</div>
+
+@if (loading()) {
+  <app-loading-state inline label="Loading appointments…"></app-loading-state>
+} @else {
+  <ejs-grid
+    #apptGrid
+    [dataSource]="filteredAppts()"
+    [allowPaging]="true"
+    [pageSettings]="pageSettings"
+    [allowSorting]="true"
+    [toolbar]="toolbar">
+    <e-columns>
+      <e-column headerText="Actions" width="210">
+        <ng-template #template let-data>
+          <div class="patient-appts-actions">
+            @if (data.status === 'Scheduled' || data.status === 'Confirmed') {
+              <button ejs-button cssClass="e-primary e-small" (click)="openConfirm(data, 'checkin')">Check In</button>
+            }
+            @if (data.status === 'Scheduled' || data.status === 'Confirmed') {
+              <button ejs-button cssClass="e-info e-small e-outline" (click)="openConfirm(data, 'noshow')">No-Show</button>
+            }
+            @if (data.status === 'Scheduled' || data.status === 'Confirmed' || data.status === 'CheckedIn') {
+              <button ejs-button cssClass="e-danger e-small e-outline" (click)="openCancel(data)">Cancel</button>
+            }
+          </div>
+        </ng-template>
+      </e-column>
+      <e-column field="scheduledDateTime" headerText="Date/Time" width="160">
+        <ng-template #template let-data>{{ fmtApptDate(data.scheduledDateTime) }}</ng-template>
+      </e-column>
+      <e-column field="appointmentType" headerText="Type" width="140"></e-column>
+      <e-column field="providerName" headerText="Provider" width="160"></e-column>
+      <e-column field="departmentName" headerText="Department" width="140"></e-column>
+      <e-column field="locationName" headerText="Location" width="140"></e-column>
+      <e-column field="roomNumber" headerText="Room" width="90"></e-column>
+      <e-column field="status" headerText="Status" width="120">
+        <ng-template #template let-data><app-status-badge [status]="data.status"></app-status-badge></ng-template>
+      </e-column>
+      <e-column field="durationMinutes" headerText="Duration" width="100"></e-column>
+      <e-column field="reasonForVisit" headerText="Reason" width="200"></e-column>
+    </e-columns>
+  </ejs-grid>
+}
+
+<ejs-dialog
+  #bookDialog
+  [visible]="false"
+  header="Book Appointment"
+  [showCloseIcon]="true"
+  width="520px"
+  (close)="closeBook()"
+  [buttons]="[
+    { click: onBookSubmit.bind(this), buttonModel: { content: bookSubmitting() ? 'Saving…' : 'Book', isPrimary: true, disabled: bookSubmitting() } },
+    { click: closeBook.bind(this), buttonModel: { content: 'Cancel', cssClass: 'e-flat' } }
+  ]">
+  <ng-template #content>
+    <div class="book-form">
+      <div class="form-row">
+        <label>Provider</label>
+        <ejs-dropdownlist
+          #providerDropDown
+          [dataSource]="providers()"
+          [fields]="{ text: 'displayText', value: 'providerId' }"
+          [(value)]="providerId"
+          [sortOrder]="'Ascending'"
+          placeholder="Select provider">
+        </ejs-dropdownlist>
+      </div>
+      <div class="form-row form-row--split">
+        <div>
+          <label>Department</label>
+          <ejs-dropdownlist
+            #deptDropDown
+            [dataSource]="departmentOptions()"
+            [fields]="{ text: 'displayLabel', value: 'departmentId' }"
+            [(value)]="departmentId"
+            [sortOrder]="'Ascending'"
+            placeholder="Select">
+          </ejs-dropdownlist>
+        </div>
+        <div>
+          <label>Location</label>
+          <ejs-dropdownlist
+            #locationDropDown
+            [dataSource]="locations()"
+            [fields]="{ text: 'locationName', value: 'locationId' }"
+            [(value)]="locationId"
+            [sortOrder]="'Ascending'"
+            placeholder="Select">
+          </ejs-dropdownlist>
+        </div>
+      </div>
+      <div class="form-row form-row--split">
+        <div>
+          <label>Type</label>
+          <ejs-dropdownlist
+            #typeDropDown
+            [dataSource]="apptTypes"
+            [(value)]="apptType"
+            [sortOrder]="'Ascending'">
+          </ejs-dropdownlist>
+        </div>
+        <div>
+          <label>Duration (min)</label>
+          <ejs-dropdownlist
+            #durationDropDown
+            [dataSource]="durations"
+            [(value)]="duration"
+            [sortOrder]="'Ascending'">
+          </ejs-dropdownlist>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Date / Time</label>
+        <ejs-datetimepicker
+          #scheduledPicker
+          [(value)]="scheduled"
+          format="MMM d, yyyy h:mm a">
+        </ejs-datetimepicker>
+      </div>
+      <div class="form-row">
+        <label>Reason for Visit</label>
+        <ejs-textbox
+          #reasonInput
+          [(value)]="reason"
+          [multiline]="true"
+          placeholder="Reason for visit">
+        </ejs-textbox>
+      </div>
+      @if (bookError(); as err) {
+        <div class="book-error">{{ err }}</div>
+      }
+    </div>
+  </ng-template>
+</ejs-dialog>
+
+<ejs-dialog
+  #cancelDialog
+  [visible]="false"
+  header="Cancel Appointment"
+  [showCloseIcon]="true"
+  width="400px"
+  (close)="closeCancel()"
+  [buttons]="[
+    { click: runCancel.bind(this), buttonModel: { content: 'Confirm Cancel', cssClass: 'e-danger' } },
+    { click: closeCancel.bind(this), buttonModel: { content: 'Dismiss', cssClass: 'e-flat' } }
+  ]">
+  <ng-template #content>
+    <div class="cancel-body">
+      <p>Cancel appointment on {{ cancelTarget()?.scheduledDateTime | date:'short' }}?</p>
+      <ejs-textbox
+        #cancelReasonInput
+        [multiline]="true"
+        placeholder="Reason (optional)">
+      </ejs-textbox>
+    </div>
+  </ng-template>
+</ejs-dialog>
+
+<ejs-dialog
+  #confirmDialog
+  [visible]="false"
+  [header]="confirmHeader()"
+  [showCloseIcon]="true"
+  width="360px"
+  (close)="closeConfirm()"
+  [buttons]="[
+    { click: runConfirm.bind(this), buttonModel: { content: confirmPrimaryText(), isPrimary: true } },
+    { click: closeConfirm.bind(this), buttonModel: { content: 'Dismiss', cssClass: 'e-flat' } }
+  ]">
+  <ng-template #content>
+    <div class="confirm-body">
+      @if (confirmAction()?.kind === 'checkin') {
+        Check in this patient for the selected appointment?
+      } @else {
+        Mark this appointment as a no-show?
+      }
+    </div>
+  </ng-template>
+</ejs-dialog>

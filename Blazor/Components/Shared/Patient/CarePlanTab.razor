@@ -1,0 +1,192 @@
+@inject PatientService PatientService
+@inject AiService AiService
+
+@if (_loading)
+{
+    <LoadingState Inline="true" Label="Loading care plan…" />
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <ErrorBanner Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_plan is null)
+{
+    <EmptyState Title="No care plan" Description="Generate a draft to create a care plan." />
+}
+else
+{
+    <div class="care-plan-tab">
+        <div class="care-plan-header">
+            <div>
+                <div class="care-plan-title">@_plan.Title</div>
+                <div class="care-plan-subtitle">
+                    @_plan.AuthorName • Version @_plan.Version • Last updated @FormatDate(_plan.LastUpdated) • @_plan.Goals.Count goals
+                </div>
+            </div>
+            <div class="care-plan-header-actions">
+                @if (_confidence is not null)
+                {
+                    <span class="care-plan-confidence">
+                        AI Confidence:
+                        <strong style="color: @(_confidence >= 0.8 ? "var(--color-sf-fg-success-primary)" : "var(--color-sf-fg-warning-primary)");">
+                            @Math.Round(_confidence.Value * 100)%
+                        </strong>
+                    </span>
+                }
+                <SfButton CssClass="e-primary" Disabled="_drafting" OnClick="@(args => GenerateDraftAsync())">
+                    @(_drafting ? "Generating…" : "✨ Generate Draft")
+                </SfButton>
+                <SfButton CssClass="e-success" Disabled="_publishing" OnClick="@(args => PublishAsync())">
+                    @(_publishing ? "Publishing…" : "Publish")
+                </SfButton>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_draftError))
+        {
+            <div class="care-plan-error">@_draftError</div>
+        }
+
+        @if (!string.IsNullOrEmpty(_draftExplanation))
+        {
+            <div class="care-plan-draft-meta">@_draftExplanation Generated sections: @string.Join(", ", _generatedSections).</div>
+        }
+
+        @if (_published)
+        {
+            <div class="care-plan-banner-success">✓ Care plan published. New version logged to audit trail.</div>
+        }
+
+        <div class="care-plan-layout">
+            <div class="care-plan-editor-shell">
+                <div class="care-plan-editor-header">
+                    <span class="care-plan-editor-title">Care Plan Document</span>
+                    <span class="care-plan-editor-hint">Track changes · Mail merge · Comments · Revision history</span>
+                </div>
+                <SfDocumentEditorContainer @ref="_container"
+                                           EnableToolbar="true"
+                                           Width="100%"
+                                           Height="max(520px, calc(100vh - 360px))">
+                    <DocumentEditorContainerEvents Created="OnEditorCreated" />
+                </SfDocumentEditorContainer>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string PatientId { get; set; } = string.Empty;
+
+    private SfDocumentEditorContainer? _container;
+    private CarePlanDto? _plan;
+    private bool _loading = true;
+    private string? _error;
+
+    private bool _drafting;
+    private string? _draftError;
+    private double? _confidence;
+    private string? _draftExplanation;
+    private List<string> _generatedSections = new();
+    private bool _publishing;
+    private bool _published;
+    private int _publishToken;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var result = await PatientService.GetPatientCarePlanAsync(PatientId);
+            if (result.IsOk)
+                _plan = result.Data;
+            else
+                _error = result.Error?.Title ?? "Failed to load care plan.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        _loading = false;
+    }
+
+    private async Task OnEditorCreated()
+    {
+        if (_plan is not null)
+            await LoadIntoEditorAsync(_plan.SdoContent);
+    }
+
+    private async Task LoadIntoEditorAsync(string content)
+    {
+        if (_container?.DocumentEditor is null) return;
+        var editor = _container.DocumentEditor;
+        try
+        {
+            await editor.OpenAsync(null);
+            if (!string.IsNullOrEmpty(content))
+            {
+                await editor.Editor.InsertTextAsync(content);
+                await editor.Selection.MoveToDocumentStartAsync();
+            }
+            await _container.ResizeAsync();
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task GenerateDraftAsync()
+    {
+        _drafting = true;
+        _draftError = null;
+        _published = false;
+        try
+        {
+            var result = await AiService.DraftCarePlanAsync(PatientId);
+            if (result.IsOk && result.Data is not null)
+            {
+                _confidence = result.Data.Confidence;
+                _draftExplanation = result.Data.Explanation;
+                _generatedSections = result.Data.GeneratedSections;
+                await LoadIntoEditorAsync(result.Data.SdoContent);
+            }
+            else
+            {
+                _draftError = result.Error?.Detail ?? "Failed to generate care plan draft.";
+            }
+        }
+        catch
+        {
+            _draftError = "Failed to reach the AI service.";
+        }
+        finally
+        {
+            _drafting = false;
+        }
+    }
+
+    private async Task PublishAsync()
+    {
+        _publishing = true;
+        StateHasChanged();
+        await Task.Delay(900);
+        _publishing = false;
+        _published = true;
+        var token = ++_publishToken;
+        StateHasChanged();
+        await Task.Delay(3500);
+        if (token == _publishToken)
+        {
+            _published = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string FormatDate(string iso) =>
+        DateFormats.FormatDate(iso);
+}

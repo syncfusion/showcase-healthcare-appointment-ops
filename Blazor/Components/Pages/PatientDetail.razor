@@ -1,0 +1,364 @@
+@page "/patients/{PatientId}"
+@rendermode InteractiveServer
+@using HealthcareAppointmentOps.Blazor.Components.Shared
+@inject PatientService PatientService
+@inject AppointmentService AppointmentService
+@inject AuditLogService AuditLogService
+@inject ThemeService ThemeService
+@implements IDisposable
+
+<PageTitle>Patient Details | Healthcare Appointment and Patient Operations Portal</PageTitle>
+
+@if (_loading)
+{
+    <LoadingState Label="Loading patient…" />
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <ErrorBanner Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_patient is null)
+{
+    <EmptyState Title="Patient not found" Description="The requested patient does not exist." />
+}
+else
+{
+    <div class="patient-detail-page">
+        <div class="patient-detail-header">
+            <InitialsAvatar FirstName="@_patient.FirstName" LastName="@_patient.LastName" Size="64" Color="var(--color-sf-bg-success-solid)" />
+            <div class="patient-detail-identity">
+                <div class="patient-detail-name">@_patient.FirstName @_patient.LastName</div>
+                <div class="patient-detail-meta">
+                    MRN: @_patient.MedicalRecordNumber • DOB: @DateFormats.FormatDate(_patient.DateOfBirth)@(Age is not null ? $" • Age: {Age}" : "")
+                </div>
+                <div class="patient-detail-contact">
+                    @_patient.PhoneNumber • @_patient.Email • PCP:
+                    @if (!string.IsNullOrEmpty(_patient.PrimaryCareProviderId))
+                    {
+                        <a href="/providers/@_patient.PrimaryCareProviderId">@(string.IsNullOrEmpty(_patient.PrimaryCareProviderName) ? "View" : _patient.PrimaryCareProviderName)</a>
+                    }
+                    else
+                    {
+                        @(string.IsNullOrEmpty(_patient.PrimaryCareProviderName) ? "—" : _patient.PrimaryCareProviderName)
+                    }
+                </div>
+            </div>
+            <div class="patient-detail-actions">
+                <StatusBadge Status="@(_patient.IsActive ? "Active" : "Inactive")" />
+                <SfButton CssClass="e-outline" OnClick="@(args => _bookDialogOpen = true)">Book Appointment</SfButton>
+            </div>
+        </div>
+
+        <SfTab @bind-SelectedItem="_selectedTab" LoadOn="ContentLoad.Demand" CssClass="patient-detail-tabs">
+            <TabItems>
+                <TabItem>
+                    <ChildContent>
+                        <TabHeader Text="Overview" />
+                    </ChildContent>
+                    <ContentTemplate>
+                        <div class="patient-tab-panel">
+                            <div class="patient-overview">
+                                <div class="patient-overview-kpis">
+                                    <KpiCard Title="Total Appointments" Value="@_appointments.Count.ToString()" Icon="@AppIcon.CalendarDays(18)" />
+                                    <KpiCard Title="Completed" Value="@CompletedCount.ToString()" Icon="@AppIcon.CheckCircle(18)" />
+                                    <KpiCard Title="Upcoming" Value="@UpcomingCount.ToString()" Icon="@AppIcon.Clock(18)" />
+                                    <KpiCard Title="No-Shows" Value="@NoShowCount.ToString()" Icon="@AppIcon.UserX(18)" />
+                                </div>
+
+                                <div class="patient-overview-row responsive-collapse-grid">
+                                    <div class="patient-overview-panel">
+                                        <div class="patient-overview-panel-title">Patient Timeline</div>
+                                        <PatientTimeline Appointments="_appointments" AuditEntries="_auditEntries" />
+                                    </div>
+
+                                    <div class="patient-overview-stack">
+                                        <div class="patient-overview-panel">
+                                            <div class="patient-overview-panel-title">Upcoming Appointment</div>
+                                            @if (NextVisit is null)
+                                            {
+                                                <div class="patient-next-visit-empty">
+                                                    <div class="patient-next-visit-empty-icon">📅</div>
+                                                    <div class="patient-next-visit-empty-title">No upcoming appointments</div>
+                                                    <div class="patient-next-visit-empty-sub">A future appointment will appear here once scheduled.</div>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="patient-next-visit">
+                                                    <div class="patient-next-visit-header">
+                                                        <div class="patient-next-visit-date">@FormatDateTime(NextVisit.ScheduledDateTime)</div>
+                                                        <StatusBadge Status="@NextVisit.Status.ToString()" />
+                                                    </div>
+
+                                                    <div class="patient-next-visit-type-row">
+                                                        <div class="patient-next-visit-icon-badge">
+                                                            @AppIcon.Stethoscope(16)
+                                                        </div>
+                                                        <div>
+                                                            <div class="patient-next-visit-type">@NextVisit.AppointmentType</div>
+                                                            <div class="patient-next-visit-provider">
+                                                                @NextVisit.ProviderName
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="patient-next-visit-meta-grid">
+                                                        <div class="patient-next-visit-meta-item">
+                                                            @IconBuilding(14)
+                                                            <span>@NextVisit.DepartmentName</span>
+                                                        </div>
+                                                        <div class="patient-next-visit-meta-item">
+                                                            @AppIcon.MapPin(14)
+                                                            <span>@NextVisit.LocationName@if (!string.IsNullOrEmpty(NextVisit.RoomNumber))
+                                                            {
+                                                                <span> · Room @NextVisit.RoomNumber</span>
+                                                            }</span>
+                                                        </div>
+                                                        <div class="patient-next-visit-meta-item">
+                                                            @IconHourglass(14)
+                                                            <span>@NextVisit.DurationMinutes min</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+
+                                        <div class="patient-overview-panel">
+                                            <div class="patient-overview-panel-title">Patient Information</div>
+                                            <div class="patient-info-grid">
+                                                <div class="patient-info-field">
+                                                    <div class="patient-info-label">Gender</div>
+                                                    <div class="patient-info-value">@Display(_patient.Gender)</div>
+                                                </div>
+                                                <div class="patient-info-field">
+                                                    <div class="patient-info-label">Preferred Language</div>
+                                                    <div class="patient-info-value">@Display(_patient.PreferredLanguage)</div>
+                                                </div>
+                                                <div class="patient-info-field">
+                                                    <div class="patient-info-label">Insurance</div>
+                                                    <div class="patient-info-value">@Display(_patient.InsuranceType)</div>
+                                                </div>
+                                                <div class="patient-info-field">
+                                                    <div class="patient-info-label">Registration Date</div>
+                                                    <div class="patient-info-value">@DateFormats.FormatDate(_patient.RegistrationDate)</div>
+                                                </div>
+                                                <div class="patient-info-field">
+                                                    <div class="patient-info-label">Proxy Access</div>
+                                                    <div class="patient-info-value">@(_patient.HasProxyAccess ? "Yes" : "No")</div>
+                                                </div>
+                                                <div class="patient-info-field">
+                                                    <div class="patient-info-label">Address</div>
+                                                    <div class="patient-info-value">@Display($"{_patient.AddressLine}, {_patient.City}, {_patient.State} {_patient.PostalCode}".Trim(' ', ','))</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent>
+                        <TabHeader Text="Appointments" />
+                    </ChildContent>
+                    <ContentTemplate>
+                        <div class="patient-tab-panel">
+                            <AppointmentsTab Appointments="_appointments" OnChanged="RefreshActivityAsync" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent>
+                        <TabHeader Text="Clinical History" />
+                    </ChildContent>
+                    <ContentTemplate>
+                        <div class="patient-tab-panel">
+                            <ClinicalHistoryTab PatientId="@PatientId" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent>
+                        <TabHeader Text="Medications" />
+                    </ChildContent>
+                    <ContentTemplate>
+                        <div class="patient-tab-panel">
+                            <MedicationsTab PatientId="@PatientId" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent>
+                        <TabHeader Text="Documents" />
+                    </ChildContent>
+                    <ContentTemplate>
+                        <div class="patient-tab-panel">
+                            <DocumentsTab PatientId="@PatientId" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent>
+                        <TabHeader Text="Care Plan" />
+                    </ChildContent>
+                    <ContentTemplate>
+                        <div class="patient-tab-panel">
+                            <CarePlanTab PatientId="@PatientId" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+            </TabItems>
+        </SfTab>
+    </div>
+
+    <BookAppointmentDialog Visible="_bookDialogOpen"
+                           PatientId="@PatientId"
+                           OnClose="@(() => _bookDialogOpen = false)"
+                           OnCreated="OnAppointmentBooked" />
+}
+
+@code {
+    [Parameter] public string PatientId { get; set; } = string.Empty;
+
+    private PatientDetailDto? _patient;
+    private List<AppointmentSummaryDto> _appointments = new();
+    private List<AuditLogDto> _auditEntries = new();
+    private bool _loading = true;
+    private string? _error;
+    private int _selectedTab;
+    private bool _bookDialogOpen;
+
+    private int CompletedCount => _appointments.Count(a => a.Status == AppointmentStatus.Completed);
+    private int NoShowCount => _appointments.Count(a => a.Status == AppointmentStatus.NoShow);
+    private int UpcomingCount => _appointments.Count(IsUpcoming);
+
+    private AppointmentSummaryDto? NextVisit => _appointments
+        .Where(IsUpcoming)
+        .OrderBy(a => DateTime.Parse(a.ScheduledDateTime))
+        .FirstOrDefault();
+
+    private static bool IsUpcoming(AppointmentSummaryDto a) =>
+        (a.Status == AppointmentStatus.Scheduled || a.Status == AppointmentStatus.Confirmed) &&
+        DateTime.TryParse(a.ScheduledDateTime, out var dt) && dt >= DateTime.Now;
+
+    private int? Age
+    {
+        get
+        {
+            if (_patient is null || !DateTime.TryParse(_patient.DateOfBirth, out var dob)) return null;
+            var today = DateTime.Today;
+            var age = today.Year - dob.Year;
+            if (dob.Date > today.AddYears(-age)) age--;
+            return age;
+        }
+    }
+
+    private Syncfusion.Blazor.Theme ChartThemeValue => ChartTheme.Resolve(ThemeService.Resolved);
+    private string ChartThemeKey => ChartTheme.KeyFor(ThemeService.Resolved);
+
+    protected override async Task OnInitializedAsync()
+    {
+        ThemeService.OnChange += OnThemeChanged;
+        await LoadAsync();
+    }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => ThemeService.OnChange -= OnThemeChanged;
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var patientTask = PatientService.GetPatientAsync(PatientId);
+            var appointmentsTask = AppointmentService.GetAppointmentsAsync(
+                new AppointmentFilterRequest { PatientId = PatientId },
+                new PagingRequest { Offset = 0, Limit = 200 });
+            var auditTask = AuditLogService.GetAuditLogsAsync("Patient", PatientId, new PagingRequest { Offset = 0, Limit = 50 });
+            await Task.WhenAll(patientTask, appointmentsTask, auditTask);
+
+            if (patientTask.Result.IsOk)
+                _patient = patientTask.Result.Data;
+            else
+                _error = patientTask.Result.Error?.Title ?? "Failed to load patient.";
+
+            if (appointmentsTask.Result.IsOk)
+                _appointments = appointmentsTask.Result.Data?.Items ?? new();
+            if (auditTask.Result.IsOk)
+                _auditEntries = auditTask.Result.Data?.Items ?? new();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        _loading = false;
+    }
+
+    private async Task RefreshActivityAsync()
+    {
+        try
+        {
+            var appointmentsTask = AppointmentService.GetAppointmentsAsync(
+                new AppointmentFilterRequest { PatientId = PatientId },
+                new PagingRequest { Offset = 0, Limit = 200 });
+            var auditTask = AuditLogService.GetAuditLogsAsync("Patient", PatientId, new PagingRequest { Offset = 0, Limit = 50 });
+            await Task.WhenAll(appointmentsTask, auditTask);
+            if (appointmentsTask.Result.IsOk)
+                _appointments = appointmentsTask.Result.Data?.Items ?? new();
+            if (auditTask.Result.IsOk)
+                _auditEntries = auditTask.Result.Data?.Items ?? new();
+        }
+        catch
+        {
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnAppointmentBooked()
+    {
+        _bookDialogOpen = false;
+        await RefreshActivityAsync();
+        _selectedTab = 1;
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private static string FormatDateTime(string iso) =>
+        DateFormats.FormatDateTime(iso);
+
+    private static RenderFragment IconBuilding(int size = 14) => b =>
+    {
+        b.OpenElement(0, "svg");
+        b.AddAttribute(1, "xmlns", "http://www.w3.org/2000/svg");
+        b.AddAttribute(2, "width", size);
+        b.AddAttribute(3, "height", size);
+        b.AddAttribute(4, "viewBox", "0 0 24 24");
+        b.AddAttribute(5, "fill", "none");
+        b.AddAttribute(6, "stroke", "currentColor");
+        b.AddAttribute(7, "stroke-width", "2");
+        b.AddAttribute(8, "stroke-linecap", "round");
+        b.AddAttribute(9, "stroke-linejoin", "round");
+        b.AddAttribute(10, "aria-hidden", "true");
+        b.AddMarkupContent(11, "<rect x=\"4\" y=\"2\" width=\"16\" height=\"20\" rx=\"2\" /><path d=\"M9 22v-4h6v4\" /><path d=\"M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01\" />");
+        b.CloseElement();
+    };
+
+    private static RenderFragment IconHourglass(int size = 14) => b =>
+    {
+        b.OpenElement(0, "svg");
+        b.AddAttribute(1, "xmlns", "http://www.w3.org/2000/svg");
+        b.AddAttribute(2, "width", size);
+        b.AddAttribute(3, "height", size);
+        b.AddAttribute(4, "viewBox", "0 0 24 24");
+        b.AddAttribute(5, "fill", "none");
+        b.AddAttribute(6, "stroke", "currentColor");
+        b.AddAttribute(7, "stroke-width", "2");
+        b.AddAttribute(8, "stroke-linecap", "round");
+        b.AddAttribute(9, "stroke-linejoin", "round");
+        b.AddAttribute(10, "aria-hidden", "true");
+        b.AddMarkupContent(11, "<path d=\"M6 2h12M6 22h12\" /><path d=\"M6 2v4l4 6-4 6v4M18 2v4l-4 6 4 6v4\" />");
+        b.CloseElement();
+    };
+}

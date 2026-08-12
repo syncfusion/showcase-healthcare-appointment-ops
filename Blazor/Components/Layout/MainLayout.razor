@@ -1,0 +1,163 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject ThemeService ThemeService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div id="app-shell">
+    <SfSidebar @bind-IsOpen="_sidebarOpen"
+               ID="app-sidebar"
+               Type="@(_isMobile ? SidebarType.Over : SidebarType.Push)"
+               Position="SidebarPosition.Left"
+               EnableDock="@(!_isMobile)"
+               DockSize="60px"
+               Width="220px"
+               Animate="true">
+        <ChildContent>
+            <div class="sidebar-logo">
+                <span class="sidebar-logo-icon" aria-hidden="true">@AppIcon.HeartPulse(24)</span>
+                <span class="sidebar-logo-full">Meridian Health</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                @foreach (var item in NavItems)
+                {
+                    <NavLink class="sidebar-nav-link" href="@item.To" Match="@item.Match">
+                        <span class="sidebar-nav-icon" aria-hidden="true">@item.Icon</span>
+                        <span class="sidebar-label">@item.Label</span>
+                    </NavLink>
+                }
+            </nav>
+
+            <button type="button" class="sidebar-toggle" @onclick="ToggleSidebar" aria-label="Toggle sidebar">
+                @ToggleIcon
+            </button>
+        </ChildContent>
+    </SfSidebar>
+
+    <div class="app-main @(_sidebarOpen ? null : "app-main-docked")">
+        <header class="app-header">
+            <div class="app-header-title">
+                @if (_isMobile)
+                {
+                    <button type="button" class="hamburger-btn" @onclick="OpenMobileSidebar" aria-label="Open navigation">
+                        @AppIcon.Menu(18)
+                    </button>
+                }
+                @if (CurrentHeaderInfo.Icon != null)
+                {
+                    <span class="app-header-iconbox" aria-hidden="true">@CurrentHeaderInfo.Icon</span>
+                }
+                <div style="min-width: 0;">
+                    <h1 class="app-header-text">@CurrentHeaderInfo.Label</h1>
+                    @if (!string.IsNullOrEmpty(CurrentHeaderInfo.Description))
+                    {
+                        <p class="app-header-desc">@CurrentHeaderInfo.Description</p>
+                    }
+                </div>
+            </div>
+
+            <div class="app-header-actions">
+                <ThemeSwitcher />
+            </div>
+        </header>
+
+        <main class="app-content">
+            @Body
+        </main>
+    </div>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">×</span>
+</div>
+
+@code {
+    private const int MobileBreakpoint = 768;
+
+    private bool _sidebarOpen = true;
+    private bool _isMobile;
+    private DotNetObjectReference<MainLayout>? _dotNetRef;
+
+    private record NavItem(string To, string Label, string Description, RenderFragment Icon, NavLinkMatch Match = NavLinkMatch.Prefix);
+
+    private record HeaderInfo(string Label, string? Description = null, RenderFragment? Icon = null);
+
+    private List<NavItem> NavItems => new()
+    {
+        new("/", "Dashboard", "At-a-glance KPIs, upcoming appointments, and department activity.", AppIcon.LayoutDashboard(18), NavLinkMatch.All),
+        new("/schedule", "Schedule", "View and manage provider schedules and book appointments.", AppIcon.CalendarDays(18)),
+        new("/patients", "Patients", "Browse patient records, demographics, and appointment history.", AppIcon.Users(18)),
+        new("/waitlist", "Waitlist", "Monitor pending appointment requests and optimize slot allocation.", AppIcon.Clock(18)),
+        new("/providers", "Providers", "Review provider profiles, utilization, and availability.", AppIcon.Stethoscope(18)),
+        new("/reports", "Reports", "Analyze appointment volume, no-shows, and utilization trends.", AppIcon.BarChart3(18)),
+        new("/settings", "Settings", "Configure departments, locations, and portal appearance.", AppIcon.Settings(18)),
+    };
+
+    private RenderFragment ToggleIcon => _sidebarOpen ? AppIcon.ChevronLeft(18) : AppIcon.ChevronRight(18);
+
+    private HeaderInfo CurrentHeaderInfo => ResolveHeaderInfo(NavigationManager.Uri);
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ThemeService.InitializeAsync();
+
+            _isMobile = await JS.InvokeAsync<bool>("healthOpsMedia.isMobile", MobileBreakpoint);
+            _sidebarOpen = !_isMobile;
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("healthOpsMedia.registerResizeListener", _dotNetRef, MobileBreakpoint);
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public void OnViewportResized(bool isMobile)
+    {
+        if (_isMobile == isMobile) return;
+        _isMobile = isMobile;
+        _sidebarOpen = !isMobile;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (_isMobile) _sidebarOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleSidebar() => _sidebarOpen = !_sidebarOpen;
+
+    private void OpenMobileSidebar() => _sidebarOpen = true;
+
+    private HeaderInfo ResolveHeaderInfo(string uri)
+    {
+        var path = new Uri(uri).AbsolutePath.TrimEnd('/').ToLowerInvariant();
+        if (string.IsNullOrEmpty(path)) path = "/";
+
+        var exact = NavItems.FirstOrDefault(n => n.To.TrimEnd('/').ToLowerInvariant() == path);
+        if (exact != null)
+            return new HeaderInfo(exact.Label, exact.Description, exact.Icon);
+
+        if (path.StartsWith("/patients/"))
+            return new HeaderInfo("Patient Details", "Demographics, clinical history, medications, care plan, and appointments.", AppIcon.Users(20));
+        if (path.StartsWith("/providers/"))
+            return new HeaderInfo("Provider Details", "Provider profile, schedule, utilization, and availability.", AppIcon.Stethoscope(20));
+
+        return new HeaderInfo("Healthcare Portal");
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+        _dotNetRef?.Dispose();
+    }
+}

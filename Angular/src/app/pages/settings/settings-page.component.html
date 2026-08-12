@@ -1,0 +1,94 @@
+<div class="settings">
+  <nav class="tabs" role="tablist">
+    @for (tab of tabs; track tab.id) {
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab() === tab.id"
+        class="tab"
+        [class.tab--active]="activeTab() === tab.id"
+        (click)="setTab(tab.id)">
+        {{ tab.label }}
+      </button>
+    }
+  </nav>
+
+  <div class="panel">
+    @if (activeTab() === 'departments') {
+      @if (departmentsError(); as err) {
+        <app-error-banner title="Unable to load departments" [message]="err" (retry)="retryDepartments()"></app-error-banner>
+      } @else if (departmentsLoading() && departments().length === 0) {
+        <app-loading-state inline label="Loading departments…"></app-loading-state>
+      } @else {
+        <ejs-grid
+          [dataSource]="departments()"
+          [allowPaging]="true"
+          [pageSettings]="pageSettings"
+          [allowSorting]="true"
+          [enableAdaptiveUI]="true"
+          adaptiveUIMode="Mobile">
+          <e-columns>
+            <e-column field="departmentCode" headerText="Code" width="100" isPrimaryKey="true"></e-column>
+            <e-column field="departmentName" headerText="Name" width="200"></e-column>
+            <e-column field="locationName" headerText="Location" width="200"></e-column>
+            <e-column field="isActive" headerText="Active" width="90" displayAsCheckBox="true"></e-column>
+          </e-columns>
+        </ejs-grid>
+      }
+    }
+
+    @if (activeTab() === 'locations') {
+      @if (locationsError(); as err) {
+        <app-error-banner title="Unable to load locations" [message]="err" (retry)="retryLocations()"></app-error-banner>
+      } @else if (locationsLoading() && locations().length === 0) {
+        <app-loading-state inline label="Loading locations…"></app-loading-state>
+      } @else {
+        <ejs-grid
+          [dataSource]="locations()"
+          [allowPaging]="true"
+          [pageSettings]="pageSettings"
+          [allowSorting]="true"
+          [enableAdaptiveUI]="true"
+          adaptiveUIMode="Mobile">
+          <e-columns>
+            <e-column field="locationName" headerText="Name" width="200" isPrimaryKey="true"></e-column>
+            <e-column field="addressLine" headerText="Address" width="240"></e-column>
+            <e-column field="city" headerText="City" width="120"></e-column>
+            <e-column field="state" headerText="State" width="80"></e-column>
+            <e-column field="postalCode" headerText="ZIP" width="100"></e-column>
+            <e-column field="phoneNumber" headerText="Phone" width="140"></e-column>
+            <e-column field="timeZone" headerText="Time Zone" width="160"></e-column>
+            <e-column field="isActive" headerText="Active" width="90" displayAsCheckBox="true"></e-column>
+          </e-columns>
+        </ejs-grid>
+      }
+    }
+
+    @if (activeTab() === 'theme') {
+      <div class="appearance">
+        <h3 class="appearance-title">Appearance</h3>
+
+        <div class="appearance-row">
+          <div class="appearance-meta">
+            <div class="appearance-label">Theme</div>
+            <div class="appearance-hint">Choose light, dark, or follow your system setting</div>
+          </div>
+          <div class="segmented" role="radiogroup" aria-label="Theme">
+            @for (opt of themeOptions; track opt.mode) {
+              <button
+                type="button"
+                role="radio"
+                [attr.aria-checked]="themeService.getMode() === opt.mode"
+                class="segmented-item"
+                [class.segmented-item--active]="themeService.getMode() === opt.mode"
+                (click)="setTheme(opt.mode)">
+                {{ opt.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+      </div>
+    }
+  </div>
+</div>

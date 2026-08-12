@@ -1,0 +1,6 @@
+<Solution>
+    <Project Path="HealthcareAppointmentOps.Api/HealthcareAppointmentOps.Api.csproj" />
+    <Project Path="HealthcareAppointmentOps.Application/HealthcareAppointmentOps.Application.csproj" />
+    <Project Path="HealthcareAppointmentOps.Domain/HealthcareAppointmentOps.Domain.csproj" />
+    <Project Path="HealthcareAppointmentOps.Infrastructure/HealthcareAppointmentOps.Infrastructure.csproj" />
+</Solution>

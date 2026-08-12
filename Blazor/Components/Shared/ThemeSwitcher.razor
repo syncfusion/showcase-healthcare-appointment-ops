@@ -1,0 +1,93 @@
+@using HealthcareAppointmentOps.Blazor.Services
+@inject ThemeService ThemeService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div @ref="_root" style="position: relative; display: flex; align-items: center;">
+    <button type="button"
+            @onclick="Toggle"
+            aria-haspopup="menu"
+            aria-expanded="@_open"
+            aria-label="Change theme"
+            title="Change theme"
+            style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-8); border: 1px solid var(--color-sf-border-secondary); background: var(--color-sf-bg-primary); color: var(--color-sf-fg-tertiary); cursor: pointer; padding: 0;">
+        @TriggerIcon
+    </button>
+
+    @if (_open)
+    {
+        <div role="menu"
+             style="position: absolute; top: calc(100% + 6px); right: 0; min-width: 160px; background: var(--color-sf-bg-primary); border: 1px solid var(--color-sf-border-secondary); border-radius: var(--radius-8); box-shadow: var(--shadow-lg); padding: 4px; z-index: 1000;">
+            @foreach (var option in Options)
+            {
+                var active = ThemeService.Mode == option.Mode;
+                <button type="button"
+                        role="menuitemradio"
+                        aria-checked="@active"
+                        @onclick="() => Select(option.Mode)"
+                        style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: none; border-radius: var(--radius-6); background: @(active ? "var(--color-sf-bg-brand-primary)" : "transparent"); color: @(active ? "var(--color-sf-fg-brand-primary)" : "var(--color-sf-fg-secondary)"); font-size: 13px; font-weight: @(active ? "600" : "500"); cursor: pointer; text-align: left;">
+                    @option.Icon
+                    <span style="flex: 1;">@option.Label</span>
+                    @if (active)
+                    {
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    }
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _open;
+    private ElementReference _root;
+
+    private record Option(ThemeMode Mode, string Label, RenderFragment Icon);
+
+    private List<Option> Options => new()
+    {
+        new(ThemeMode.Light, "Light", SunIcon),
+        new(ThemeMode.Dark, "Dark", MoonIcon),
+        new(ThemeMode.System, "System", MonitorIcon)
+    };
+
+    private RenderFragment TriggerIcon => ThemeService.Resolved == ResolvedTheme.Dark ? MoonIcon : SunIcon;
+
+    protected override void OnInitialized()
+    {
+        ThemeService.OnChange += OnThemeChanged;
+    }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => ThemeService.OnChange -= OnThemeChanged;
+
+    private void Toggle() => _open = !_open;
+
+    private async Task Select(ThemeMode mode)
+    {
+        await ThemeService.SetModeAsync(mode);
+        _open = false;
+    }
+
+    [JSInvokable]
+    public void CloseDropdown()
+    {
+        _open = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("healthOpsThemeSwitcher.init", _root, DotNetObjectReference.Create(this));
+        }
+    }
+
+    private static RenderFragment SunIcon => AppIcon.Sun();
+
+    private static RenderFragment MoonIcon => AppIcon.Moon();
+
+    private static RenderFragment MonitorIcon => AppIcon.Monitor();
+}

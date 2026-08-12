@@ -1,0 +1,385 @@
+/* =============================================================================
+   Design Tokens
+   -----------------------------------------------------------------------------
+   Tier 1  Primitives ...... raw, theme-agnostic values            -> :root
+   Tier 2  Semantic (light) . intent aliases for the light theme    -> :root
+   Tier 2  Semantic (dark) .. same alias names, dark assignments     -> [data-theme="dark"]
+
+   ============================================================================= */
+
+/* ----------------------------------------------------------------------------
+   TIER 1 — PRIMITIVES (theme-agnostic)
+   ---------------------------------------------------------------------------- */
+:root {
+  /* Base */
+  --color-sf-base-white: #fff;
+  --color-sf-base-black: #000;
+  --color-sf-base-transparent: transparent;
+  --color-sf-white: #fff;
+  --color-sf-black: #000;
+
+  /* RGB helpers (for rgba() usage in either theme) */
+  --color-sf-gray-100-rgb: 242, 244, 247;
+  --color-sf-gray-600-rgb: 71, 84, 103;
+  --color-sf-gray-900-rgb: 16, 24, 40;
+
+  /* Gray scale */
+  --color-sf-gray-25:  #FCFCFD;
+  --color-sf-gray-50:  #F9FAFB;
+  --color-sf-gray-100: #F2F4F7;
+  --color-sf-gray-200: #EAECF0;
+  --color-sf-gray-300: #D0D5DD;
+  --color-sf-gray-400: #98A1B2;
+  --color-sf-gray-500: #667085;
+  --color-sf-gray-600: #475467;
+  --color-sf-gray-700: #344054;
+  --color-sf-gray-800: #18212F;
+  --color-sf-gray-900: #101828;
+  --color-sf-gray-950: #0C111D;
+
+  /* Brand scale */
+  --color-sf-brand-25:  #FCFAFF;
+  --color-sf-brand-50:  #F9F5FF;
+  --color-sf-brand-100: #F4EBFF;
+  --color-sf-brand-200: #E9D7FE;
+  --color-sf-brand-300: #D6BBFB;
+  --color-sf-brand-400: #B692F6;
+  --color-sf-brand-500: #9D76ED;
+  --color-sf-brand-600: #7E56D8;
+  --color-sf-brand-700: #6840C6;
+  --color-sf-brand-800: #52379E;
+  --color-sf-brand-900: #422F7D;
+  --color-sf-brand-950: #2B1B5E;
+
+  /* Error scale */
+  --color-sf-error-25:  #FEFAFA;
+  --color-sf-error-50:  #FEF2F1;
+  --color-sf-error-100: #FEE3E1;
+  --color-sf-error-200: #FECDC9;
+  --color-sf-error-300: #FCA19B;
+  --color-sf-error-400: #F97066;
+  --color-sf-error-500: #F04437;
+  --color-sf-error-600: #D92C20;
+  --color-sf-error-700: #B32218;
+  --color-sf-error-800: #901F17;
+  --color-sf-error-900: #7A2619;
+  --color-sf-error-950: #54150C;
+
+  /* Warning scale */
+  --color-sf-warning-25:  #FFFCF4;
+  --color-sf-warning-50:  #FFF9EB;
+  --color-sf-warning-100: #FEEFC6;
+  --color-sf-warning-200: #FEDE88;
+  --color-sf-warning-300: #FEC84A;
+  --color-sf-warning-400: #FCB022;
+  --color-sf-warning-500: #F78F08;
+  --color-sf-warning-600: #DB6803;
+  --color-sf-warning-700: #B54707;
+  --color-sf-warning-800: #93370C;
+  --color-sf-warning-900: #792D0D;
+  --color-sf-warning-950: #4E1D08;
+
+  /* Success scale */
+  --color-sf-success-25:  #F5FDF9;
+  --color-sf-success-50:  #ECFCF2;
+  --color-sf-success-100: #DBF9E6;
+  --color-sf-success-200: #AAEFC6;
+  --color-sf-success-300: #75DFA6;
+  --color-sf-success-400: #47CD89;
+  --color-sf-success-500: #17B169;
+  --color-sf-success-600: #069454;
+  --color-sf-success-700: #057647;
+  --color-sf-success-800: #075D39;
+  --color-sf-success-900: #074C30;
+  --color-sf-success-950: #043320;
+
+  /* Cyan (info) scale */
+  --color-sf-cyan-25:  #F5FEFF;
+  --color-sf-cyan-50:  #ECFDFF;
+  --color-sf-cyan-100: #CFF9FE;
+  --color-sf-cyan-200: #A5F0FC;
+  --color-sf-cyan-300: #67E3F9;
+  --color-sf-cyan-400: #22CCEE;
+  --color-sf-cyan-500: #06AEDA;
+  --color-sf-cyan-600: #088AB2;
+  --color-sf-cyan-700: #0E7090;
+  --color-sf-cyan-800: #155B75;
+  --color-sf-cyan-900: #164C63;
+  --color-sf-cyan-950: #0D2D3A;
+
+  /* Spacing scale */
+  --spacing-0: 0px;   --spacing-2: 2px;   --spacing-4: 4px;   --spacing-6: 6px;
+  --spacing-8: 8px;   --spacing-10: 10px; --spacing-12: 12px; --spacing-14: 14px;
+  --spacing-16: 16px; --spacing-20: 20px; --spacing-24: 24px; --spacing-28: 28px;
+  --spacing-32: 32px; --spacing-40: 40px; --spacing-48: 48px; --spacing-56: 56px;
+  --spacing-72: 72px;
+
+  /* Typography scale */
+  --font-size-xxs: 10px; --font-size-xs: 12px;  --font-size-sm: 14px;
+  --font-size-base: 16px; --font-size-lg: 18px; --font-size-xl: 20px;
+  --font-size-2xl: 24px; --font-size-3xl: 30px; --font-size-4xl: 36px;
+  --line-height-xxs: 14px; --line-height-xs: 16px; --line-height-sm: 20px;
+  --line-height-base: 24px; --line-height-lg: 28px; --line-height-2xl: 32px;
+  --font-weight-normal: 400; --font-weight-medium: 500;
+  --font-weight-semibold: 600; --font-weight-bold: 700;
+
+  /* Border width */
+  --border-0: 0px; --border-1: 1px; --border-2: 2px; --border-3: 3px; --border-4: 4px;
+
+  /* Border radius */
+  --radius-0: 0px;  --radius-2: 2px;  --radius-4: 4px;  --radius-6: 6px;
+  --radius-8: 8px;  --radius-12: 12px; --radius-14: 14px; --radius-16: 16px;
+  --radius-20: 20px; --radius-24: 24px; --radius-28: 28px; --radius-full: 1000px;
+
+  /* Shadows */
+  --shadow-none: 0px 0px 0px rgba(0, 0, 0, 0);
+  --shadow-sm: 0px 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-default: 0px 1px 3px rgba(0, 0, 0, 0.1), 0px 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0px 4px 6px rgba(0, 0, 0, 0.1), 0px 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0px 10px 15px rgba(0, 0, 0, 0.1), 0px 4px 6px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0px 20px 25px rgba(0, 0, 0, 0.1), 0px 10px 10px rgba(0, 0, 0, 0.04);
+}
+
+/* ----------------------------------------------------------------------------
+   TIER 2 — SEMANTIC (LIGHT)
+   ---------------------------------------------------------------------------- */
+:root {
+  /* Brand */
+  --color-sf-brand-primary: var(--color-sf-brand-600);
+  --color-sf-on-brand-solid-primary: var(--color-sf-base-white);
+  --color-sf-brand-solid-primary: var(--color-sf-brand-600);
+  --color-sf-brand-solid-primary-hover: var(--color-sf-brand-700);
+
+  /* Background */
+  --color-sf-bg-primary: var(--color-sf-base-white);
+  --color-sf-bg-primary-alt: var(--color-sf-base-white);
+  --color-sf-bg-primary-hover: var(--color-sf-gray-50);
+  --color-sf-bg-primary-solid: var(--color-sf-gray-950);
+  --color-sf-bg-secondary: var(--color-sf-gray-50);
+  --color-sf-bg-secondary-alt: var(--color-sf-gray-50);
+  --color-sf-bg-secondary-hover: var(--color-sf-gray-100);
+  --color-sf-bg-secondary-subtle: var(--color-sf-gray-25);
+  --color-sf-bg-tertiary: var(--color-sf-gray-100);
+  --color-sf-bg-quaternary: var(--color-sf-gray-200);
+  --color-sf-bg-active: var(--color-sf-gray-50);
+  --color-sf-bg-disabled: var(--color-sf-gray-100);
+  --color-sf-bg-disabled-subtle: var(--color-sf-gray-50);
+  --color-sf-bg-overlay: var(--color-sf-gray-900);
+  --color-sf-bg-brand-primary: var(--color-sf-brand-50);
+  --color-sf-bg-brand-primary-alt: var(--color-sf-brand-50);
+  --color-sf-bg-brand-secondary: var(--color-sf-brand-100);
+  --color-sf-bg-brand-solid: var(--color-sf-brand-600);
+  --color-sf-bg-brand-solid-hover: var(--color-sf-brand-700);
+  --color-sf-bg-error-primary: var(--color-sf-error-50);
+  --color-sf-bg-error-secondary: var(--color-sf-error-100);
+  --color-sf-bg-error-solid: var(--color-sf-error-600);
+  --color-sf-bg-warning-primary: var(--color-sf-warning-50);
+  --color-sf-bg-warning-secondary: var(--color-sf-warning-100);
+  --color-sf-bg-warning-solid: var(--color-sf-warning-600);
+  --color-sf-bg-success-primary: var(--color-sf-success-50);
+  --color-sf-bg-success-secondary: var(--color-sf-success-100);
+  --color-sf-bg-success-solid: var(--color-sf-success-600);
+  --color-sf-bg-info-primary: var(--color-sf-cyan-50);
+
+  /* Border */
+  --color-sf-border-primary: var(--color-sf-gray-300);
+  --color-sf-border-primary-alt: var(--color-sf-gray-400);
+  --color-sf-border-secondary: var(--color-sf-gray-200);
+  --color-sf-border-tertiary: var(--color-sf-gray-100);
+  --color-sf-border-disabled: var(--color-sf-gray-300);
+  --color-sf-border-brand: var(--color-sf-brand-300);
+  --color-sf-border-brand-solid: var(--color-sf-brand-600);
+  --color-sf-border-error: var(--color-sf-error-300);
+  --color-sf-border-error-solid: var(--color-sf-error-600);
+  --color-sf-border-success: var(--color-sf-success-400);
+  --color-sf-border-warning: var(--color-sf-warning-300);
+  --color-sf-border-info: var(--color-sf-cyan-300);
+
+  /* Foreground */
+  --color-sf-fg-primary: var(--color-sf-gray-900);
+  --color-sf-fg-secondary: var(--color-sf-gray-700);
+  --color-sf-fg-secondary-hover: var(--color-sf-gray-800);
+  --color-sf-fg-tertiary: var(--color-sf-gray-600);
+  --color-sf-fg-tertiary-hover: var(--color-sf-gray-700);
+  --color-sf-fg-quaternary: var(--color-sf-gray-500);
+  --color-sf-fg-quaternary-hover: var(--color-sf-gray-600);
+  --color-sf-fg-quinary: var(--color-sf-gray-400);
+  --color-sf-fg-senary: var(--color-sf-gray-300);
+  --color-sf-fg-on-brand-primary: var(--color-sf-base-white);
+  --color-sf-fg-on-brand-secondary: var(--color-sf-gray-200);
+  --color-sf-fg-white: var(--color-sf-base-white);
+  --color-sf-fg-disabled: var(--color-sf-gray-500);
+  --color-sf-fg-disabled-subtle: var(--color-sf-gray-300);
+  --color-sf-fg-placeholder: var(--color-sf-gray-500);
+  --color-sf-fg-brand-primary: var(--color-sf-brand-600);
+  --color-sf-fg-brand-secondary: var(--color-sf-brand-500);
+  --color-sf-fg-error-primary: var(--color-sf-error-600);
+  --color-sf-fg-error-secondary: var(--color-sf-error-500);
+  --color-sf-fg-warning-primary: var(--color-sf-warning-600);
+  --color-sf-fg-warning-secondary: var(--color-sf-warning-500);
+  --color-sf-fg-success-primary: var(--color-sf-success-600);
+  --color-sf-fg-success-secondary: var(--color-sf-success-500);
+  --color-sf-fg-info-primary: var(--color-sf-cyan-700);
+
+  /* Utility */
+  --color-sf-utility-tooltip-bg: var(--color-sf-gray-950);
+  --color-sf-utility-tooltip-text: var(--color-sf-base-white);
+  --color-sf-utility-overlay-bg-color: rgba(71, 84, 103, .7);
+  --color-sf-utility-avatar-border-color: rgba(0, 0, 0, .075);
+
+  --color-sf-appt-consultation: #2563EB;
+  --color-sf-appt-annual-physical: #166534;
+  --color-sf-appt-lab-review: #7C3AED;
+  --color-sf-appt-telehealth: #0E7490;
+  --color-sf-appt-procedure: #C2410C;
+  --color-sf-appt-follow-up: #A16207;
+  --color-sf-appt-urgent-care: #DC2626;
+  --color-sf-appt-vaccination: #0F766E;
+  --color-sf-appt-imaging: #9333EA;
+  --color-sf-appt-administrative: #6B7280;
+  --color-sf-appt-new-patient: #9F1239;
+  --color-sf-appt-fallback: #6B7280;
+
+  --color-sf-chip-cardiology-bg: #FEE2E2;        --color-sf-chip-cardiology-fg: #B91C1C;
+  --color-sf-chip-neurology-bg: #E0E7FF;         --color-sf-chip-neurology-fg: #4338CA;
+  --color-sf-chip-orthopedics-bg: #FEF3C7;       --color-sf-chip-orthopedics-fg: #B45309;
+  --color-sf-chip-pediatrics-bg: #CCFBF1;        --color-sf-chip-pediatrics-fg: #0F766E;
+  --color-sf-chip-dermatology-bg: #FCE7F3;       --color-sf-chip-dermatology-fg: #BE185D;
+  --color-sf-chip-ophthalmology-bg: #DBEAFE;     --color-sf-chip-ophthalmology-fg: #1D4ED8;
+  --color-sf-chip-internal-medicine-bg: #DCFCE7; --color-sf-chip-internal-medicine-fg: #15803D;
+  --color-sf-chip-family-medicine-bg: #DCFCE7;   --color-sf-chip-family-medicine-fg: #15803D;
+  --color-sf-chip-obstetrics-gynecology-bg: #FCE7F3; --color-sf-chip-obstetrics-gynecology-fg: #9D174D;
+  --color-sf-chip-obstetrics-bg: #FCE7F3;        --color-sf-chip-obstetrics-fg: #9D174D;
+  --color-sf-chip-gynecology-bg: #FCE7F3;        --color-sf-chip-gynecology-fg: #9D174D;
+  --color-sf-chip-endocrinology-bg: #F3E8FF;     --color-sf-chip-endocrinology-fg: #7E22CE;
+  --color-sf-chip-oncology-bg: #EDE9FE;          --color-sf-chip-oncology-fg: #6D28D9;
+  --color-sf-chip-psychiatry-bg: #E0F2FE;        --color-sf-chip-psychiatry-fg: #0369A1;
+  --color-sf-chip-gastroenterology-bg: #FFEDD5;  --color-sf-chip-gastroenterology-fg: #C2410C;
+  --color-sf-chip-urology-bg: #CFFAFE;           --color-sf-chip-urology-fg: #0E7490;
+  --color-sf-chip-radiology-bg: #F1F5F9;         --color-sf-chip-radiology-fg: #334155;
+  --color-sf-chip-pulmonology-bg: #E0F2FE;       --color-sf-chip-pulmonology-fg: #0284C7;
+  --color-sf-chip-nephrology-bg: #FEF9C3;        --color-sf-chip-nephrology-fg: #A16207;
+  --color-sf-chip-rheumatology-bg: #FFE4E6;      --color-sf-chip-rheumatology-fg: #BE123C;
+  --color-sf-chip-neutral-bg: #EEF2FF;           --color-sf-chip-neutral-fg: #3730A3;
+}
+
+/* ----------------------------------------------------------------------------
+   TIER 2 — SEMANTIC (DARK)
+   ---------------------------------------------------------------------------- */
+[data-theme="dark"] {
+  /* Brand */
+  --color-sf-brand-primary: var(--color-sf-brand-500);
+  --color-sf-on-brand-solid-primary: var(--color-sf-base-white);
+  --color-sf-brand-solid-primary: var(--color-sf-brand-600);
+  --color-sf-brand-solid-primary-hover: var(--color-sf-brand-500);
+
+  /* Background */
+  --color-sf-bg-primary: var(--color-sf-gray-950);
+  --color-sf-bg-primary-alt: var(--color-sf-gray-900);
+  --color-sf-bg-primary-hover: var(--color-sf-gray-800);
+  --color-sf-bg-primary-solid: var(--color-sf-gray-900);
+  --color-sf-bg-secondary: var(--color-sf-gray-900);
+  --color-sf-bg-secondary-alt: var(--color-sf-gray-950);
+  --color-sf-bg-secondary-hover: var(--color-sf-gray-800);
+  --color-sf-bg-secondary-subtle: var(--color-sf-gray-900);
+  --color-sf-bg-tertiary: var(--color-sf-gray-800);
+  --color-sf-bg-quaternary: var(--color-sf-gray-700);
+  --color-sf-bg-active: var(--color-sf-gray-800);
+  --color-sf-bg-disabled: var(--color-sf-gray-800);
+  --color-sf-bg-disabled-subtle: var(--color-sf-gray-900);
+  --color-sf-bg-overlay: var(--color-sf-gray-800);
+  --color-sf-bg-brand-primary: var(--color-sf-brand-950);
+  --color-sf-bg-brand-primary-alt: var(--color-sf-gray-900);
+  --color-sf-bg-brand-secondary: var(--color-sf-brand-900);
+  --color-sf-bg-brand-solid: var(--color-sf-brand-600);
+  --color-sf-bg-brand-solid-hover: var(--color-sf-brand-500);
+  --color-sf-bg-error-primary: var(--color-sf-error-950);
+  --color-sf-bg-error-secondary: var(--color-sf-error-900);
+  --color-sf-bg-error-solid: var(--color-sf-error-600);
+  --color-sf-bg-warning-primary: var(--color-sf-warning-950);
+  --color-sf-bg-warning-secondary: var(--color-sf-warning-900);
+  --color-sf-bg-warning-solid: var(--color-sf-warning-600);
+  --color-sf-bg-success-primary: var(--color-sf-success-950);
+  --color-sf-bg-success-secondary: var(--color-sf-success-900);
+  --color-sf-bg-success-solid: var(--color-sf-success-600);
+  --color-sf-bg-info-primary: var(--color-sf-cyan-900);
+
+  /* Border */
+  --color-sf-border-primary: var(--color-sf-gray-700);
+  --color-sf-border-primary-alt: var(--color-sf-gray-600);
+  --color-sf-border-secondary: var(--color-sf-gray-800);
+  --color-sf-border-tertiary: var(--color-sf-gray-800);
+  --color-sf-border-disabled: var(--color-sf-gray-700);
+  --color-sf-border-brand: var(--color-sf-brand-400);
+  --color-sf-border-brand-solid: var(--color-sf-brand-500);
+  --color-sf-border-error: var(--color-sf-error-400);
+  --color-sf-border-error-solid: var(--color-sf-error-500);
+  --color-sf-border-success: var(--color-sf-success-400);
+  --color-sf-border-warning: var(--color-sf-warning-400);
+  --color-sf-border-info: var(--color-sf-cyan-400);
+
+  /* Foreground */
+  --color-sf-fg-primary: var(--color-sf-gray-100);
+  --color-sf-fg-secondary: var(--color-sf-gray-300);
+  --color-sf-fg-secondary-hover: var(--color-sf-gray-200);
+  --color-sf-fg-tertiary: var(--color-sf-gray-400);
+  --color-sf-fg-tertiary-hover: var(--color-sf-gray-300);
+  --color-sf-fg-quaternary: var(--color-sf-gray-400);
+  --color-sf-fg-quaternary-hover: var(--color-sf-gray-300);
+  --color-sf-fg-quinary: var(--color-sf-gray-400);
+  --color-sf-fg-senary: var(--color-sf-gray-600);
+  --color-sf-fg-on-brand-primary: var(--color-sf-gray-100);
+  --color-sf-fg-on-brand-secondary: var(--color-sf-gray-300);
+  --color-sf-fg-white: var(--color-sf-base-white);
+  --color-sf-fg-disabled: var(--color-sf-gray-400);
+  --color-sf-fg-disabled-subtle: var(--color-sf-gray-600);
+  --color-sf-fg-placeholder: var(--color-sf-gray-400);
+  --color-sf-fg-brand-primary: var(--color-sf-brand-400);
+  --color-sf-fg-brand-secondary: var(--color-sf-brand-400);
+  --color-sf-fg-error-primary: var(--color-sf-error-400);
+  --color-sf-fg-error-secondary: var(--color-sf-error-400);
+  --color-sf-fg-warning-primary: var(--color-sf-warning-400);
+  --color-sf-fg-warning-secondary: var(--color-sf-warning-400);
+  --color-sf-fg-success-primary: var(--color-sf-success-400);
+  --color-sf-fg-success-secondary: var(--color-sf-success-400);
+  --color-sf-fg-info-primary: var(--color-sf-cyan-400);
+
+  /* Utility */
+  --color-sf-utility-tooltip-bg: var(--color-sf-gray-200);
+  --color-sf-utility-tooltip-text: var(--color-sf-gray-950);
+  --color-sf-utility-overlay-bg-color: rgba(var(--color-sf-gray-600-rgb), .5);
+  --color-sf-utility-avatar-border-color: rgba(var(--color-sf-gray-100-rgb), .075);
+
+  --color-sf-chip-cardiology-bg: #4A1A1A;        --color-sf-chip-cardiology-fg: #FCA5A5;
+  --color-sf-chip-neurology-bg: #1E2A5E;         --color-sf-chip-neurology-fg: #C7D2FE;
+  --color-sf-chip-orthopedics-bg: #4A3410;       --color-sf-chip-orthopedics-fg: #FCD34D;
+  --color-sf-chip-pediatrics-bg: #134E4A;        --color-sf-chip-pediatrics-fg: #99F6E4;
+  --color-sf-chip-dermatology-bg: #4A1A33;       --color-sf-chip-dermatology-fg: #FBCFE8;
+  --color-sf-chip-ophthalmology-bg: #1E3A5E;     --color-sf-chip-ophthalmology-fg: #BFDBFE;
+  --color-sf-chip-internal-medicine-bg: #134E2A; --color-sf-chip-internal-medicine-fg: #BBF7D0;
+  --color-sf-chip-family-medicine-bg: #134E2A;   --color-sf-chip-family-medicine-fg: #BBF7D0;
+  --color-sf-chip-obstetrics-gynecology-bg: #4A1A33; --color-sf-chip-obstetrics-gynecology-fg: #FBCFE8;
+  --color-sf-chip-obstetrics-bg: #4A1A33;        --color-sf-chip-obstetrics-fg: #FBCFE8;
+  --color-sf-chip-gynecology-bg: #4A1A33;        --color-sf-chip-gynecology-fg: #FBCFE8;
+  --color-sf-chip-endocrinology-bg: #3B1E5E;     --color-sf-chip-endocrinology-fg: #E9D5FF;
+  --color-sf-chip-oncology-bg: #2E1A5E;          --color-sf-chip-oncology-fg: #DDD6FE;
+  --color-sf-chip-psychiatry-bg: #1E3A5E;        --color-sf-chip-psychiatry-fg: #BAE6FD;
+  --color-sf-chip-gastroenterology-bg: #4A2E10;  --color-sf-chip-gastroenterology-fg: #FED7AA;
+  --color-sf-chip-urology-bg: #134E5E;           --color-sf-chip-urology-fg: #A5F3FC;
+  --color-sf-chip-radiology-bg: #2A3340;         --color-sf-chip-radiology-fg: #CBD5E1;
+  --color-sf-chip-pulmonology-bg: #1E3A5E;       --color-sf-chip-pulmonology-fg: #BAE6FD;
+  --color-sf-chip-nephrology-bg: #4A3A10;        --color-sf-chip-nephrology-fg: #FDE68A;
+  --color-sf-chip-rheumatology-bg: #4A1A22;      --color-sf-chip-rheumatology-fg: #FECDD3;
+  --color-sf-chip-neutral-bg: #1E2A5E;           --color-sf-chip-neutral-fg: #C7D2FE;
+}
+
+:root {
+  --primary-blue: var(--color-sf-bg-brand-solid);
+  --success-green: var(--color-sf-fg-success-primary);
+  --warning-amber: var(--color-sf-fg-warning-primary);
+  --danger-red: var(--color-sf-fg-error-primary);
+  --text-primary: var(--color-sf-fg-primary);
+  --text-secondary: var(--color-sf-fg-tertiary);
+  --surface: var(--color-sf-bg-primary);
+  --background: var(--color-sf-bg-secondary);
+}

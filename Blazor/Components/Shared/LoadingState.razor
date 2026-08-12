@@ -1,0 +1,33 @@
+@using Syncfusion.Blazor.Popups
+
+<div role="status" aria-live="polite" aria-busy="true"
+     style="@(Inline ? "display:flex;align-items:center;gap:10px;padding:12px 4px;" : "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:40px 16px;min-height:120px;")">
+    <div @ref="_spinnerTarget" style="position:relative;width:@(Inline ? "18px" : "28px");height:@(Inline ? "18px" : "28px");"></div>
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <span style="font-size: var(--font-size-sm); color: var(--color-sf-fg-tertiary);">@Label</span>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public bool Inline { get; set; }
+
+    private ElementReference _spinnerTarget;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("healthOpsSpinner.create", _spinnerTarget, Inline ? 18 : 28);
+            await JS.InvokeVoidAsync("healthOpsSpinner.show", _spinnerTarget);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await JS.InvokeVoidAsync("healthOpsSpinner.hide", _spinnerTarget);
+    }
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+}

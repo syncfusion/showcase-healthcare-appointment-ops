@@ -1,0 +1,134 @@
+<ejs-sidebar
+  [isOpen]="isOpen"
+  position="Right"
+  type="Over"
+  width="420px"
+  [closeOnDocumentClick]="false"
+  (close)="closePanel()"
+  style="z-index: 1000">
+  <div class="panel-body">
+    @if (loading()) {
+      <app-loading-state label="Loading appointment…"></app-loading-state>
+    } @else if (error()) {
+      <div class="panel-pad">
+        <app-error-banner [message]="error()" (retry)="loadDetail(appointmentId)"></app-error-banner>
+      </div>
+    } @else if (detail(); as d) {
+      <div class="panel-scroll">
+        <div class="panel-close-row">
+          <button ejs-button cssClass="e-flat e-small" (click)="closePanel()" title="Close">✕</button>
+        </div>
+
+        <div class="panel-content">
+          <div class="panel-header">
+            <app-status-badge [status]="d.status"></app-status-badge>
+            <div class="header-actions">
+              @if (!isTerminal()) {
+                <button ejs-button cssClass="e-info e-small" (click)="handleCheckIn()">Check In</button>
+                <button ejs-button cssClass="e-danger e-small e-outline" (click)="confirm.set('cancel')">Cancel</button>
+                <button ejs-button cssClass="e-warning e-small e-outline" (click)="confirm.set('noshow')">Mark No-Show</button>
+              }
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Status</label>
+            <ejs-dropdownlist
+              [dataSource]="statusItems()"
+              [placeholder]="'Change from ' + d.status"
+              cssClass="e-outline"
+              [sortOrder]="'Ascending'"
+              (change)="onStatusChange($event)">
+            </ejs-dropdownlist>
+          </div>
+
+          <section class="card-section">
+            <h3 class="section-title">Patient</h3>
+            <div class="row"><span class="row-label">Name</span><span class="row-value">{{ d.patientName }}</span></div>
+            <div class="row"><span class="row-label">MRN</span><span class="row-value">{{ d.patientMrn }}</span></div>
+          </section>
+
+          <section class="card-section">
+            <h3 class="section-title">Provider</h3>
+            <div class="row"><span class="row-label">Name</span><span class="row-value">{{ d.providerName }}</span></div>
+            <div class="row"><span class="row-label">Specialty</span><span class="row-value">{{ d.providerSpecialty }}</span></div>
+            <div class="row"><span class="row-label">Department</span><span class="row-value">{{ d.departmentName }}</span></div>
+          </section>
+
+          <section class="card-section">
+            <h3 class="section-title">Timing</h3>
+            <div class="row"><span class="row-label">Scheduled</span><span class="row-value">{{ d.scheduledDateTime | date: 'medium' }}</span></div>
+            <div class="row"><span class="row-label">Duration</span><span class="row-value">{{ d.durationMinutes }} min</span></div>
+            @if (endDate(); as end) {
+              <div class="row"><span class="row-label">End</span><span class="row-value">{{ end | date: 'medium' }}</span></div>
+            }
+            @if (d.checkedInDateTime) {
+              <div class="row"><span class="row-label">Checked In</span><span class="row-value">{{ d.checkedInDateTime | date: 'medium' }}</span></div>
+            }
+            @if (d.completedDateTime) {
+              <div class="row"><span class="row-label">Completed</span><span class="row-value">{{ d.completedDateTime | date: 'medium' }}</span></div>
+            }
+          </section>
+
+          <section class="card-section">
+            <h3 class="section-title">Notes</h3>
+            <div class="row"><span class="row-label">Reason for Visit</span><span class="row-value">{{ d.reasonForVisit }}</span></div>
+            <div class="row"><span class="row-label">Notes</span><span class="row-value">{{ d.notes || '—' }}</span></div>
+            <div class="row"><span class="row-label">Patient Instructions</span><span class="row-value">{{ d.patientInstructions || '—' }}</span></div>
+            @if (d.cancellationReason) {
+              <div class="row"><span class="row-label">Cancellation Reason</span><span class="row-value">{{ d.cancellationReason }}</span></div>
+            }
+          </section>
+
+          <section class="card-section">
+            <h3 class="section-title">Audit Trail (last 5)</h3>
+            @if (audit().length === 0) {
+              <div class="audit-empty">No audit entries.</div>
+            } @else {
+              <ul class="audit-list">
+                @for (entry of audit(); track entry.auditId) {
+                  <li>
+                    <div class="audit-action">{{ entry.action }}</div>
+                    <div class="audit-meta">by {{ entry.performedBy }} · {{ entry.performedAt | date: 'medium' }}</div>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+        </div>
+      </div>
+    } @else {
+      <div class="panel-empty">No appointment selected.</div>
+    }
+  </div>
+</ejs-sidebar>
+
+@if (confirm() === 'cancel') {
+  <ejs-dialog
+    header="Cancel Appointment"
+    [isModal]="true"
+    [showCloseIcon]="true"
+    width="420px"
+    (close)="confirm.set(null)"
+    [buttons]="cancelButtons">
+    <p class="dialog-text">Please provide a cancellation reason (required):</p>
+    <ejs-textbox
+      placeholder="Cancellation reason"
+      [value]="cancelReason()"
+      [multiline]="true"
+      (input)="onCancelReasonChange($any($event.target).value)">
+    </ejs-textbox>
+  </ejs-dialog>
+}
+
+@if (confirm() === 'noshow') {
+  <ejs-dialog
+    header="Mark No-Show"
+    [isModal]="true"
+    [showCloseIcon]="true"
+    width="420px"
+    (close)="confirm.set(null)"
+    [buttons]="noshowButtons">
+    <p class="dialog-text">Mark this appointment as No-Show for {{ detail()?.patientName }}?</p>
+  </ejs-dialog>
+}

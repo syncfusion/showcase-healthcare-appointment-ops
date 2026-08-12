@@ -1,0 +1,125 @@
+@if (loading()) {
+  <app-loading-state inline label="Loading documents…"></app-loading-state>
+} @else if (error(); as err) {
+  <app-error-banner [message]="err" (retry)="retryDocs()"></app-error-banner>
+} @else if (docs().length === 0) {
+  <app-empty-state
+    title="No documents"
+    description="No documents on file for this patient.">
+  </app-empty-state>
+} @else {
+  <div class="documents-layout">
+    <div class="documents-index">
+      <ejs-grid
+        #grid
+        [dataSource]="docs()"
+        [allowPaging]="true"
+        [pageSettings]="gridPageSettings"
+        [allowSorting]="true"
+        (rowSelected)="onRowSelected($event)">
+        <e-columns>
+          <e-column field="name" headerText="Document" width="140"></e-column>
+          <e-column field="uploadedDate" headerText="Uploaded" width="100">
+            <ng-template #template let-data>{{ data.uploadedDate | date:'MM/dd/yyyy' }}</ng-template>
+          </e-column>
+          <e-column field="status" headerText="Status" width="90">
+            <ng-template #template let-data><app-status-badge [status]="data.status"></app-status-badge></ng-template>
+          </e-column>
+        </e-columns>
+      </ejs-grid>
+    </div>
+
+    <div class="documents-preview">
+      @if (!selected()) {
+        <app-empty-state
+          title="Select a document"
+          description="Choose a row on the left to preview the PDF and demonstrate search, annotation, bookmark, and thumbnail navigation.">
+        </app-empty-state>
+      } @else {
+        <div class="preview-header">
+          <div>
+            <div class="preview-title">{{ selected()?.name }}</div>
+            <div class="preview-meta">
+              {{ selected()?.providerName }} • {{ selected()?.uploadedDate | date:'shortDate' }} • {{ selected()?.pageCount }} page(s) • {{ fileSize(selected()?.sizeBytes ?? 0) }}
+            </div>
+          </div>
+          @if (selected()?.type === 'Lab Report') {
+            <button ejs-button cssClass="e-primary" (click)="summarize()">✨ Summarize</button>
+          }
+        </div>
+        <div class="pdf-wrap">
+          <ejs-pdfviewer
+            #pdfViewer
+            [documentPath]="pdfUrl()"
+            resourceUrl="https://cdn.syncfusion.com/ej2/33.2.15/dist/ej2-pdfviewer-lib"
+            [enableBookmark]="true"
+            [enableThumbnail]="true"
+            [enableTextSelection]="true"
+            [enableTextSearch]="true"
+            [enablePrint]="true"
+            [enableNavigation]="true"
+            [enableMagnification]="true"
+            [enableAnnotation]="true"
+            [enableFormFields]="true"
+            style="height: max(480px, calc(100vh - 320px)); width: 100%;">
+          </ejs-pdfviewer>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<ejs-sidebar #sidebar type="Over" position="Right" width="420px" [isOpen]="false">
+  <div class="ai-sidebar">
+    <div class="ai-sidebar-header">
+      <div class="ai-sidebar-title">Lab Report AI Summary</div>
+      <button ejs-button cssClass="e-flat" (click)="closeSidebar()">Close</button>
+    </div>
+
+    <div class="ai-sidebar-body">
+      @if (aiLoading()) {
+        <app-loading-state inline label="Analyzing document…"></app-loading-state>
+      } @else if (aiError(); as err) {
+        <app-error-banner [message]="err"></app-error-banner>
+      } @else {
+        @if (aiSummary(); as summary) {
+          <div class="ai-section">
+            <div class="ai-section-title">Summary</div>
+            <div class="ai-text">{{ summary.summary }}</div>
+          </div>
+          <div class="ai-section">
+            <div class="ai-section-title">Explanation</div>
+            <div class="ai-text">{{ summary.explanation }}</div>
+          </div>
+          <div class="ai-section">
+            <div class="ai-section-title">Confidence</div>
+            <div class="ai-text">{{ summary.confidence.toFixed(2) }}</div>
+          </div>
+        }
+
+        @if (aiRecs().length > 0) {
+          <div class="ai-section">
+            <div class="ai-section-title">Recommendations</div>
+            <div class="ai-recs">
+              @for (rec of aiRecs(); track rec.id) {
+                <div class="ai-rec" [class.ai-rec--accepted]="rec.accepted" [class.ai-rec--rejected]="rec.rejected">
+                  <div class="ai-rec-severity" [attr.data-severity]="rec.severity">{{ rec.severity }}</div>
+                  <div class="ai-rec-title">{{ rec.title }}</div>
+                  <div class="ai-rec-rationale">{{ rec.rationale }}</div>
+                  @if (!rec.accepted && !rec.rejected) {
+                    <div class="ai-rec-actions">
+                      <button ejs-button cssClass="e-success e-small e-outline" (click)="accept(rec)">Accept</button>
+                      <button ejs-button cssClass="e-danger e-small e-outline" (click)="reject(rec)">Reject</button>
+                    </div>
+                  } @else {
+                    <div class="ai-rec-status">{{ rec.accepted ? 'Accepted' : 'Rejected' }}</div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+</ejs-sidebar>

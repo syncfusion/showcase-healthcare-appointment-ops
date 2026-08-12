@@ -1,0 +1,44 @@
+{
+  "name": "healthcare-appointment-ops-react",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview --port 5174"
+  },
+  "dependencies": {
+    "@syncfusion/ej2-base": "^33.2.3",
+    "@syncfusion/ej2-data": "^33.2.3",
+    "@syncfusion/ej2-react-buttons": "^33.2.3",
+    "@syncfusion/ej2-react-calendars": "^33.2.3",
+    "@syncfusion/ej2-react-charts": "^33.2.3",
+    "@syncfusion/ej2-react-documenteditor": "^33.2.3",
+    "@syncfusion/ej2-react-dropdowns": "^33.2.3",
+    "@syncfusion/ej2-react-grids": "^33.2.3",
+    "@syncfusion/ej2-react-inputs": "^33.2.3",
+    "@syncfusion/ej2-react-interactive-chat": "^33.2.15",
+    "@syncfusion/ej2-react-kanban": "^33.2.3",
+    "@syncfusion/ej2-react-layouts": "^33.2.3",
+    "@syncfusion/ej2-react-lists": "^33.2.3",
+    "@syncfusion/ej2-react-navigations": "^33.2.3",
+    "@syncfusion/ej2-react-notifications": "^33.2.3",
+    "@syncfusion/ej2-react-pdfviewer": "^33.2.3",
+    "@syncfusion/ej2-react-popups": "^33.2.3",
+    "@syncfusion/ej2-react-progressbar": "^33.2.3",
+    "@syncfusion/ej2-react-schedule": "^33.2.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.17.0",
+    "lucide-react": "^1.21.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "~5.8.3",
+    "vite": "^8.0.16"
+  }
+}

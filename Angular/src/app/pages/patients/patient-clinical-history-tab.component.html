@@ -1,0 +1,164 @@
+@if (loading()) {
+  <app-loading-state inline label="Loading clinical history…"></app-loading-state>
+} @else if (error(); as err) {
+  <app-error-banner [message]="err" (retry)="retry()"></app-error-banner>
+} @else if (!data()) {
+  <app-empty-state
+    title="No clinical history"
+    description="No encounters recorded for this patient.">
+  </app-empty-state>
+} @else {
+  <div class="clinical-layout">
+    <section>
+      <div class="section-title">
+        <div class="section-title-text">Vital Signs Trend</div>
+        <div class="section-subtitle">Last 6 readings</div>
+      </div>
+      @if (vitalSeries().length === 0) {
+        <app-empty-state title="No vitals recorded"></app-empty-state>
+      } @else {
+        <div [style.height]="chartFillHeight({ rows: 2, reserve: 360, cap: 420 })" >
+        <ejs-chart
+          [theme]="chartTheme()"
+          [primaryXAxis]="vitalsXAxis"
+          [primaryYAxis]="vitalsYAxis"
+          height="100%"
+          [tooltip]="vitalsTooltip"
+          [legendSettings]="legendBottom">
+          <e-series-collection>
+            @for (s of vitalSeries(); track s.name) {
+              <e-series
+                type="Line"
+                [dataSource]="s.points"
+                xName="date"
+                yName="value"
+                [name]="s.name"
+                [width]="2"
+                [marker]="vitalMarker">
+              </e-series>
+            }
+          </e-series-collection>
+        </ejs-chart>
+        </div>
+      }
+    </section>
+
+    <section>
+      <div class="section-title">
+        <div class="section-title-text">Lab Result Trends</div>
+        <div class="section-subtitle">Metabolic &amp; lipid panels over time</div>
+      </div>
+      @if (labSeries().length === 0) {
+        <app-empty-state title="No lab data"></app-empty-state>
+      } @else {
+        <div [style.height]="chartFillHeight({ rows: 2, reserve: 360, cap: 420 })">
+        <ejs-chart
+          [theme]="chartTheme()"
+          [primaryXAxis]="labsXAxis"
+          height="100%"
+          [tooltip]="labsTooltip"
+          [legendSettings]="legendBottom">
+          <e-series-collection>
+            @for (s of labSeries(); track s.name) {
+              <e-series
+                type="Line"
+                [dataSource]="s.points"
+                xName="date"
+                yName="value"
+                [name]="s.name"
+                [width]="2"
+                [marker]="s.marker">
+              </e-series>
+            }
+          </e-series-collection>
+        </ejs-chart>
+        </div>
+      }
+    </section>
+
+    <section>
+      <div class="section-header">
+        <div class="section-title">
+          <div class="section-title-text">Encounters</div>
+          <div class="section-subtitle">{{ encounterCountLabel() }}</div>
+        </div>
+        <div class="filter-chips">
+          @for (t of encounterTypes; track t) {
+            <button
+              ejs-button
+              class="chip"
+              [class.chip--active]="typeFilter() === t"
+              (click)="setTypeFilter(t)">
+              {{ t }}
+            </button>
+          }
+        </div>
+      </div>
+      @if (filteredEncounters().length === 0) {
+        <app-empty-state title="No encounters match this filter"></app-empty-state>
+      } @else {
+        <ejs-accordion expandMode="Single">
+          <e-accordionitems>
+            @for (e of filteredEncounters(); track e.encounterId) {
+              <e-accordionitem [header]="accordionHeader(e)">
+                <ng-template #content>
+                  <div class="encounter-detail">
+                    <div class="detail">
+                      <div class="detail-label">Department</div>
+                      <div class="detail-value">{{ e.departmentName || '—' }}</div>
+                    </div>
+                    <div class="detail">
+                      <div class="detail-label">Status</div>
+                      <div class="detail-value"><app-status-badge [status]="e.status"></app-status-badge></div>
+                    </div>
+                    <div class="detail">
+                      <div class="detail-label">Reason</div>
+                      <div class="detail-value">{{ e.reason || '—' }}</div>
+                    </div>
+                    <div class="detail">
+                      <div class="detail-label">Provider</div>
+                      <div class="detail-value">{{ e.providerName || '—' }}</div>
+                    </div>
+                    <div class="detail">
+                      <div class="detail-label">Assessment</div>
+                      <div class="detail-value">{{ e.assessment || '—' }}</div>
+                    </div>
+                    <div class="detail">
+                      <div class="detail-label">Plan</div>
+                      <div class="detail-value">{{ e.plan || '—' }}</div>
+                    </div>
+                  </div>
+                </ng-template>
+              </e-accordionitem>
+            }
+          </e-accordionitems>
+        </ejs-accordion>
+      }
+    </section>
+
+    <section>
+      <div class="section-title">
+        <div class="section-title-text">Referrals</div>
+        <div class="section-subtitle">{{ referralsSubtitle() }}</div>
+      </div>
+      @if (data()!.referrals.length === 0) {
+        <app-empty-state title="No referrals"></app-empty-state>
+      } @else {
+        <div class="referral-grid">
+          @for (r of data()!.referrals; track r.referralId) {
+            <div class="referral-card">
+              <div class="referral-head">
+                <span class="referral-specialty">{{ r.specialty }}</span>
+                <app-status-badge [status]="r.status"></app-status-badge>
+              </div>
+              <div class="referral-meta">
+                {{ r.requestedDate | date:'MM/dd/yyyy' }} • From {{ r.fromProvider }}
+              </div>
+              <div class="referral-reason">{{ r.reason }}</div>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  </div>
+}

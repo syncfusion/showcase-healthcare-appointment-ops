@@ -1,0 +1,140 @@
+@page "/providers"
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Buttons
+@using HealthcareAppointmentOps.Blazor.Components.Shared.Providers
+@inject ProviderService ProviderService
+@inject NavigationManager Nav
+
+<PageTitle>Providers | Healthcare Appointment and Patient Operations Portal</PageTitle>
+
+<div class="provider-list-page">
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <ErrorBanner Title="Failed to load providers" Message="@_error" OnRetry="LoadProvidersAsync" />
+    }
+
+    @if (_loading)
+    {
+        <LoadingState Label="Loading providers…" />
+    }
+    else if (_providers.Count == 0)
+    {
+        <EmptyState Title="No providers found"
+                    Description="Provider data will appear once the backend is seeded." />
+    }
+    else
+    {
+        <SfGrid TValue="ProviderSummaryDto"
+                DataSource="@_providers"
+                CssClass="provider-grid"
+                Width="100%"
+                AllowPaging="true"
+                AllowSorting="true"
+                AllowFiltering="true"
+                Toolbar="@(new List<string> { "Search" })">
+            <GridPageSettings PageSize="50" PageSizes="@(new string[] { "5", "10", "25", "50", "100" })" />
+            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+            <GridTemplates>
+                <DetailTemplate>
+                    @{
+                        var provider = (ProviderSummaryDto)context;
+                    }
+                    <ProviderScheduleDetail ProviderId="@provider.ProviderId" />
+                </DetailTemplate>
+            </GridTemplates>
+            <GridColumns>
+                <GridColumn Field="@nameof(ProviderSummaryDto.LastName)" HeaderText="Provider" Width="260">
+                    <Template>
+                        @{
+                            var p = (ProviderSummaryDto)context;
+                        }
+                        <div class="provider-cell">
+                            <InitialsAvatar FirstName="@p.FirstName" LastName="@p.LastName" Size="40" />
+                            <div class="provider-cell-body">
+                                <div class="provider-cell-name">
+                                    Dr. @p.FirstName @p.LastName@(string.IsNullOrEmpty(p.Title) ? "" : $", {p.Title}")
+                                </div>
+                            </div>
+                        </div>
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(ProviderSummaryDto.Specialty)" HeaderText="Specialty" Width="160">
+                    <Template>
+                        @{
+                            var p = (ProviderSummaryDto)context;
+                        }
+                        <SpecialtyChip Value="@p.Specialty" />
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(ProviderSummaryDto.AverageAppointmentDuration)" HeaderText="Avg Duration" Width="130">
+                    <Template>
+                        @{
+                            var p = (ProviderSummaryDto)context;
+                        }
+                        @if (p.AverageAppointmentDuration <= 0)
+                        {
+                            <span style="color: var(--color-sf-fg-quinary);">—</span>
+                        }
+                        else
+                        {
+                            <span style="font-size: 13px;">@p.AverageAppointmentDuration min</span>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(ProviderSummaryDto.LocationName)" HeaderText="Location" Width="160" HideAtMedia="(max-width: 1023px)" />
+                <GridColumn Field="@nameof(ProviderSummaryDto.NpiNumber)" HeaderText="NPI" Width="120" HideAtMedia="(max-width: 1023px)" />
+                <GridColumn Field="@nameof(ProviderSummaryDto.PhoneNumber)" HeaderText="Phone" Width="140" />
+                <GridColumn Field="@nameof(ProviderSummaryDto.IsActive)" HeaderText="Status" Width="100" HideAtMedia="(max-width: 640px)">
+                    <Template>
+                        @{
+                            var p = (ProviderSummaryDto)context;
+                        }
+                        <StatusBadge Status="@(p.IsActive ? "Active" : "Inactive")" />
+                    </Template>
+                </GridColumn>
+                <GridColumn HeaderText="Actions" Width="110" AllowFiltering="false" AllowSorting="false">
+                    <Template>
+                        @{
+                            var p = (ProviderSummaryDto)context;
+                        }
+                        <SfButton CssClass="e-flat e-primary e-small" OnClick="@(() => Nav.NavigateTo($"/providers/{p.ProviderId}"))">View</SfButton>
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </SfGrid>
+    }
+</div>
+
+@code {
+    private List<ProviderSummaryDto> _providers = new();
+    private bool _loading;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProvidersAsync();
+    }
+
+    private async Task LoadProvidersAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var res = await ProviderService.GetProvidersAsync();
+            _providers = res.IsOk && res.Data is not null ? res.Data : new();
+            if (!res.IsOk)
+                _error = res.Error?.Title ?? "Failed to load providers.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _providers = new();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

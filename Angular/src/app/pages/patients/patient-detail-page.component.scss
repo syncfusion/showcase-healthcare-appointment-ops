@@ -1,0 +1,243 @@
+.patient-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.patient-header {
+  background: var(--color-sf-bg-primary);
+  border-radius: var(--radius-8);
+  padding: 20px;
+  box-shadow: var(--shadow-default);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.patient-header-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.patient-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--color-sf-bg-success-solid);
+  color: var(--color-sf-fg-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.patient-name {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.patient-subtitle {
+  font-size: 14px;
+  color: var(--color-sf-fg-tertiary);
+}
+
+.patient-extra {
+  font-size: 12px;
+  color: var(--color-sf-fg-quinary);
+  margin-top: 4px;
+}
+
+.pcp-link {
+  color: var(--color-sf-fg-brand-primary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.patient-header-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.patient-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tab-content {
+  background: var(--color-sf-bg-primary);
+  border-radius: var(--radius-8);
+  padding: 20px;
+  box-shadow: var(--shadow-default);
+}
+
+.overview-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.overview-kpis {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.overview-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.panel {
+  background: var(--color-sf-bg-secondary);
+  border-radius: var(--radius-8);
+  padding: 16px;
+  border: 1px solid var(--color-sf-border-secondary);
+}
+
+.panel-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+.overview-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.upcoming-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.upcoming-datetime-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.upcoming-datetime {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-sf-fg-brand-primary);
+  line-height: 1.3;
+}
+
+.upcoming-type-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.upcoming-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--color-sf-bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-sf-fg-brand-primary);
+  flex-shrink: 0;
+}
+
+.upcoming-type {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.upcoming-provider {
+  font-size: 12px;
+  color: var(--color-sf-fg-tertiary);
+}
+
+.upcoming-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.upcoming-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-sf-fg-secondary);
+
+  svg {
+    color: var(--color-sf-fg-quaternary);
+  }
+}
+
+.upcoming-empty {
+  text-align: center;
+  padding: 24px 12px;
+}
+
+.upcoming-empty-emoji {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.upcoming-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-sf-fg-secondary);
+}
+
+.upcoming-empty-hint {
+  font-size: 13px;
+  color: var(--color-sf-fg-tertiary);
+  margin-top: 4px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.info-label {
+  font-size: 11px;
+  color: var(--color-sf-fg-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.info-value {
+  font-size: 14px;
+  color: var(--color-sf-fg-primary);
+  font-weight: 500;
+}
+
+.audit-details {
+  margin: 0;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 80px;
+  overflow: auto;
+}
+
+@media (max-width: 1024px) {
+  .overview-row {
+    grid-template-columns: 1fr;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+}

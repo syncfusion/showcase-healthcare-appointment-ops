@@ -1,0 +1,112 @@
+
+@using Syncfusion.Blazor.Buttons
+
+<div class="waitlist-entry-detail">
+    <div class="waitlist-entry-detail-header">
+        <div>
+            <div class="waitlist-entry-detail-name">@Entry.PatientName</div>
+            <div class="waitlist-entry-detail-badges">
+                <StatusBadge Status="@Entry.UrgencyLevel" />
+                <StatusBadge Status="@Entry.Status" />
+            </div>
+        </div>
+        <SfButton CssClass="e-flat e-small" IconCss="e-icons e-close" OnClick="OnCloseAsync" AriaLabel="Close" />
+    </div>
+
+    <div class="waitlist-entry-detail-body">
+        <div class="waitlist-entry-detail-section">Request</div>
+        <div class="waitlist-entry-detail-row">
+            <span class="waitlist-entry-detail-label">Appointment type</span>
+            <span class="waitlist-entry-detail-value">@Entry.RequestedAppointmentType</span>
+        </div>
+        <div class="waitlist-entry-detail-row">
+            <span class="waitlist-entry-detail-label">Preferred provider</span>
+            <span class="waitlist-entry-detail-value">@(Entry.PreferredProviderName ?? "Any available")</span>
+        </div>
+        <div class="waitlist-entry-detail-row">
+            <span class="waitlist-entry-detail-label">Department</span>
+            <span class="waitlist-entry-detail-value">@Entry.PreferredDepartmentName</span>
+        </div>
+        <div class="waitlist-entry-detail-row">
+            <span class="waitlist-entry-detail-label">Preferred dates</span>
+            <span class="waitlist-entry-detail-value">@($"{FormatDate(Entry.PreferredDateRangeStart)} – {FormatDate(Entry.PreferredDateRangeEnd)}")</span>
+        </div>
+        <div class="waitlist-entry-detail-row">
+            <span class="waitlist-entry-detail-label">Requested on</span>
+            <span class="waitlist-entry-detail-value">@($"{FormatDate(Entry.RequestDateTime)} ({WaitDays}d ago)")</span>
+        </div>
+
+        <div class="waitlist-entry-detail-section" style="margin-top: 18px;">Priority breakdown</div>
+        <div class="waitlist-entry-detail-score">
+            <span class="waitlist-entry-detail-score-value">@Entry.PriorityScore</span>
+            <span class="waitlist-entry-detail-score-caption">composite priority score</span>
+        </div>
+        <FactorBar Label="Urgency" Percent="@UrgencyPercent" Caption="@Entry.UrgencyLevel" Color="var(--color-sf-bg-warning-solid)" />
+        <FactorBar Label="Wait time" Percent="@WaitPercent" Caption="@($"{WaitDays} day{(@WaitDays == 1 ? "" : "s")}")" Color="var(--color-sf-bg-brand-solid)" />
+
+        @if (!string.IsNullOrEmpty(Entry.MatchedAppointmentId))
+        {
+            <div class="waitlist-entry-detail-matched">
+                Matched to appointment @Entry.MatchedAppointmentId
+            </div>
+        }
+    </div>
+
+    <div class="waitlist-entry-detail-footer">
+        <SfButton CssClass="e-primary"
+                  Style="flex:1"
+                  Disabled="@(!IsOpen || Removing)"
+                  OnClick="OnFindSlotAsync">
+            Find Matching Slot
+        </SfButton>
+        <SfButton CssClass="e-danger e-outline"
+                  Disabled="@(!IsOpen || Removing)"
+                  OnClick="OnRemoveAsync">
+            @(Removing ? "Removing…" : "Remove")
+        </SfButton>
+    </div>
+</div>
+
+@code {
+    [Parameter] public WaitlistEntryDto Entry { get; set; } = default!;
+    [Parameter] public bool Removing { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnFindSlot { get; set; }
+    [Parameter] public EventCallback OnRemove { get; set; }
+
+    private static readonly Dictionary<string, int> UrgencyWeight = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Routine"] = 33,
+        ["Urgent"] = 66,
+        ["Emergency"] = 100,
+    };
+
+    private bool IsOpen => string.Equals(Entry.Status, "Open", StringComparison.OrdinalIgnoreCase);
+
+    private int WaitDays
+    {
+        get
+        {
+            var d = ParseDate(Entry.RequestDateTime);
+            return d is null ? 0 : Math.Max(0, (int)DateTime.Today.Subtract(d.Value).TotalDays);
+        }
+    }
+
+    private int UrgencyPercent => UrgencyWeight.TryGetValue(Entry.UrgencyLevel, out var w) ? w : 33;
+    private int WaitPercent => Math.Min(100, (int)Math.Round((WaitDays / 30.0) * 100));
+
+    private static DateTime? ParseDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return DateTime.TryParse(value, out var d) ? d : null;
+    }
+
+    private static string FormatDate(string? value)
+    {
+        return DateFormats.FormatDate(value);
+    }
+
+    private async Task OnCloseAsync() => await OnClose.InvokeAsync();
+    private async Task OnFindSlotAsync() => await OnFindSlot.InvokeAsync();
+    private async Task OnRemoveAsync() => await OnRemove.InvokeAsync();
+}

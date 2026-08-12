@@ -1,0 +1,717 @@
+@page "/waitlist"
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Kanban
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Calendars
+@using Syncfusion.Blazor.Popups
+@using Syncfusion.Blazor.InteractiveChat
+@using Syncfusion.Blazor.ProgressBar
+@using HealthcareAppointmentOps.Blazor.Components.Shared.Waitlist
+@inject WaitlistService WaitlistService
+@inject ReferenceDataService ReferenceDataService
+@inject AiService AiService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Waitlist | Healthcare Appointment and Patient Operations Portal</PageTitle>
+
+<div class="waitlist-page">
+    <div class="waitlist-main">
+        <div class="waitlist-toolbar">
+            <div class="waitlist-filter waitlist-filter-dept">
+                <SfDropDownList TValue="string"
+                                TItem="DepartmentOption"
+                                @key="@($"dept-ddl-{_departmentOptions.Count}")"
+                                Placeholder="All Departments"
+                                DataSource="@_departmentOptions"
+                                @bind-Value="_departmentFilter"
+                                @bind-Value:after="OnDepartmentChangedAfter"
+                                AllowFiltering="true"
+                                SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending"
+                                ShowClearButton="true"
+                                CssClass="dept-group-ddl"
+                                Width="100%">
+                    <DropDownListFieldSettings Text="DepartmentName" Value="DepartmentId" GroupBy="LocationName" />
+                </SfDropDownList>
+            </div>
+            <div class="waitlist-filter waitlist-filter-urgency">
+                <SfDropDownList TValue="string"
+                                TItem="UrgencyOption"
+                                DataSource="@_urgencyOptions"
+                                @bind-Value="_urgencyFilter"
+                                @bind-Value:after="OnUrgencyChangedAfter"
+                                SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending"
+                                Width="100%">
+                    <DropDownListFieldSettings Text="Text" Value="Id" />
+                </SfDropDownList>
+            </div>
+            <div class="waitlist-filter waitlist-filter-sort">
+                <SfDropDownList TValue="string"
+                                TItem="SortOption"
+                                DataSource="@_sortOptions"
+                                @bind-Value="_sortDir"
+                                @bind-Value:after="OnSortChangedAfter"
+                                SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending"
+                                Width="100%">
+                    <DropDownListFieldSettings Text="Text" Value="Id" />
+                </SfDropDownList>
+            </div>
+            <SfButton CssClass="e-primary"
+                      IconCss="e-icons e-assistview-icon"
+                      Disabled="@_aiLoading"
+                      OnClick="@RunAiOptimizationAsync">
+                @(_aiLoading ? "Optimizing…" : "Optimize Schedule")
+            </SfButton>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <ErrorBanner Title="Failed to load waitlist" Message="@_error" OnRetry="LoadWaitlistAsync" />
+        }
+
+        @if (_loading && _items.Count == 0)
+        {
+            <LoadingState Label="Loading waitlist…" />
+        }
+        else if (_items.Count == 0)
+        {
+            <EmptyState Title="@(_urgencyFilter != "" ? "No matching entries" : "Waitlist is empty")"
+                        Description="@(_urgencyFilter != "" ? "No waitlist entries match the selected urgency." : "No patients are currently waiting for appointments.")"
+                        ActionLabel="@(_urgencyFilter != "" ? "Clear filter" : null)"
+                        OnAction="@ClearUrgencyFilter" />
+        }
+        else if (!_interactive)
+        {
+            <LoadingState Label="Loading waitlist…" />
+        }
+        else
+        {
+            <div class="waitlist-kanban-host">
+                <SfKanban TValue="WaitlistRowVm" KeyField="Entry.Status" DataSource="@_items" CssClass="waitlist-kanban" AllowDragAndDrop="!IsMobile" Width="100%" Height="100%">
+                    <KanbanSortSettings SortBy="SortOrderBy.DataSourceOrder" />
+                    <KanbanSwimlaneSettings KeyField="SwimlaneKey" TextField="SwimlaneText"
+                                            ShowItemCount="true"
+                                            SortDirection="SortDirection.Ascending" />
+                    <KanbanCardSettings HeaderField="Entry.WaitlistId" ContentField="Entry.PatientName">
+                        <Template>
+                            @{
+                                var row = (WaitlistRowVm)context;
+                                var entry = row.Entry;
+                            }
+                            <div class="waitlist-card">
+                                <div class="waitlist-card-name">@entry.PatientName</div>
+                                <div class="waitlist-card-meta">
+                                    @entry.RequestedAppointmentType · Priority @entry.PriorityScore
+                                </div>
+                                @if (!string.IsNullOrEmpty(entry.PreferredProviderName))
+                                {
+                                    <div class="waitlist-card-provider">@entry.PreferredProviderName</div>
+                                }
+                                <div class="waitlist-card-badges">
+                                    <StatusBadge Status="@entry.UrgencyLevel" />
+                                    <span class="waitlist-card-waiting">@DaysWaiting(entry.RequestDateTime) waiting</span>
+                                </div>
+                                <div class="waitlist-card-dates">
+                                    @FormatDate(entry.PreferredDateRangeStart) to @FormatDate(entry.PreferredDateRangeEnd)
+                                </div>
+                            </div>
+                        </Template>
+                    </KanbanCardSettings>
+                    <KanbanColumns>
+                        <KanbanColumn HeaderText="Open" KeyField="@(new List<string> { "Open" })" />
+                        <KanbanColumn HeaderText="Matched" KeyField="@(new List<string> { "Matched" })" />
+                        <KanbanColumn HeaderText="Closed Expired" KeyField="@(new List<string> { "Expired", "ClosedExpired" })" />
+                        <KanbanColumn HeaderText="Closed Cancelled" KeyField="@(new List<string> { "Cancelled", "ClosedCancelled" })" />
+                    </KanbanColumns>
+                    <KanbanEvents TValue="WaitlistRowVm"
+                                  CardClick="OnCardClick"
+                                  DragStop="OnDragStop" />
+                </SfKanban>
+            </div>
+        }
+    </div>
+
+    @if (_aiOpen)
+    {
+        <div class="waitlist-side waitlist-side-ai">
+            <SfAIAssistView @key="_aiVersion" CssClass="waitlist-ai">
+                <AssistViews>
+                    <AssistView Header="Schedule Optimizer">
+                        <BannerTemplate>
+                            @RenderAiBanner()
+                        </BannerTemplate>
+                        <FooterTemplate>
+                            <span style="display:none"></span>
+                        </FooterTemplate>
+                    </AssistView>
+                </AssistViews>
+            </SfAIAssistView>
+            <SfButton CssClass="e-outline e-small"
+                      Style="margin-top: 8px; width: 100%;"
+                      OnClick="@CloseAiPanel">
+                Close optimizer
+            </SfButton>
+        </div>
+    }
+    else if (_selectedEntry is not null)
+    {
+        <div class="waitlist-side waitlist-side-detail">
+            <WaitlistEntryDetail Entry="@_selectedEntry"
+                                 Removing="@_removing"
+                                 OnClose="@CloseSelectedEntry"
+                                 OnFindSlot="@OpenSlotMatchForSelected"
+                                 OnRemove="@RemoveSelectedAsync" />
+        </div>
+    }
+
+    @if (_slotEntry is not null)
+    {
+        <SlotMatchDialog Entry="@_slotEntry"
+                         OnClose="@CloseSlotMatch"
+                         OnMatched="@OnSlotMatched" />
+    }
+
+    @if (_editing is not null)
+    {
+        <SfDialog Width="380px"
+                  IsModal="true"
+                  ShowCloseIcon="true"
+                  Header="Edit suggestion"
+                  Target="body"
+                  Visible="true"
+                  Close="@(EventCallback.Factory.Create<Syncfusion.Blazor.Popups.CloseEventArgs>(this, args => CancelEdit()))">
+            <div class="waitlist-edit-grid">
+                <div>
+                    <label class="waitlist-edit-label">Proposed start</label>
+                    <SfDateTimePicker TValue="DateTime" Value="@_editing.Start">
+                        <DateTimePickerEvents TValue="DateTime" ValueChange="OnEditStartChanged" />
+                    </SfDateTimePicker>
+                </div>
+                <div>
+                    <label class="waitlist-edit-label">Proposed end</label>
+                    <SfDateTimePicker TValue="DateTime" Value="@_editing.End" Min="@_editing.Start">
+                        <DateTimePickerEvents TValue="DateTime" ValueChange="OnEditEndChanged" />
+                    </SfDateTimePicker>
+                </div>
+                <div class="waitlist-edit-actions">
+                    <SfButton CssClass="e-outline" OnClick="@CancelEdit">Cancel</SfButton>
+                    <SfButton CssClass="e-primary" OnClick="@SaveEdit">Save</SfButton>
+                </div>
+            </div>
+        </SfDialog>
+    }
+</div>
+
+@code {
+    private string _departmentFilter = string.Empty;
+    private string _urgencyFilter = string.Empty;
+    private string _sortDir = "desc";
+    private bool _interactive;
+
+    private List<WaitlistEntryDto> _rawItems = new();
+    private List<WaitlistRowVm> _items = new();
+    private bool _loading;
+    private string? _error;
+
+    private WaitlistEntryDto? _selectedEntry;
+    private bool _removing;
+    private WaitlistEntryDto? _slotEntry;
+
+    private bool _aiOpen;
+    private bool _aiLoading;
+    private ScheduleOptimizationDto? _aiResult;
+    private int _aiVersion;
+    private EditState? _editing;
+
+    private List<DepartmentOption> _departmentOptions = new();
+
+    private bool IsMobile;
+    private DotNetObjectReference<Waitlist>? _selfRef;
+
+    private static readonly List<UrgencyOption> _urgencyOptions = new()
+    {
+        new UrgencyOption { Text = "All urgencies", Id = "" },
+        new UrgencyOption { Text = "Emergency", Id = "Emergency" },
+        new UrgencyOption { Text = "Urgent", Id = "Urgent" },
+        new UrgencyOption { Text = "Routine", Id = "Routine" },
+    };
+
+    private static readonly List<SortOption> _sortOptions = new()
+    {
+        new SortOption { Text = "Priority: High → Low", Id = "desc" },
+        new SortOption { Text = "Priority: Low → High", Id = "asc" },
+    };
+
+    private static readonly Dictionary<string, string> SuggestionTypeLabel = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["fill"] = "Fill Gap",
+        ["shift"] = "Reschedule",
+        ["extend"] = "Extend Hours",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDepartmentsAsync();
+        await LoadWaitlistAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _interactive = true;
+            try
+            {
+                IsMobile = await JS.InvokeAsync<bool>("healthOpsMedia.isMobile");
+            }
+            catch
+            {
+                IsMobile = false;
+            }
+            try
+            {
+                _selfRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("healthOpsMedia.registerResizeListener", _selfRef);
+            }
+            catch
+            {
+                // best-effort; CSS media query rules still cover the layout.
+            }
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public void OnViewportResized(bool isMobile)
+    {
+        if (IsMobile == isMobile) return;
+        IsMobile = isMobile;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        _selfRef?.Dispose();
+    }
+
+    private async Task LoadDepartmentsAsync()
+    {
+        var res = await ReferenceDataService.GetDepartmentsAsync();
+        if (res.IsOk && res.Data is not null)
+        {
+            _departmentOptions = res.Data
+                .OrderBy(d => d.LocationName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(d => d.DepartmentName, StringComparer.OrdinalIgnoreCase)
+                .Select(d => new DepartmentOption
+                {
+                    DepartmentId = d.DepartmentId,
+                    DepartmentName = d.DepartmentName,
+                    LocationName = d.LocationName,
+                    DisplayLabel = string.IsNullOrEmpty(d.LocationName)
+                        ? d.DepartmentName
+                        : $"{d.DepartmentName} — {d.LocationName}"
+                })
+                .ToList();
+        }
+    }
+
+    private async Task LoadWaitlistAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var res = await WaitlistService.GetWaitlistAsync(
+                status: null,
+                departmentId: string.IsNullOrEmpty(_departmentFilter) ? null : _departmentFilter,
+                offset: 0,
+                limit: 500);
+
+            if (res.IsOk && res.Data is not null)
+            {
+                _rawItems = res.Data.Items;
+                UpdateItems();
+            }
+            else
+            {
+                _error = res.Error?.Title ?? "Failed to load waitlist entries.";
+                _rawItems = new();
+                UpdateItems();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _rawItems = new();
+            UpdateItems();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void UpdateItems()
+    {
+        _items = ApplyFiltersAndSort(_rawItems);
+    }
+
+    private List<WaitlistRowVm> ApplyFiltersAndSort(List<WaitlistEntryDto> raw)
+    {
+        var filtered = !string.IsNullOrEmpty(_urgencyFilter)
+            ? raw.Where(i => string.Equals(i.UrgencyLevel, _urgencyFilter, StringComparison.OrdinalIgnoreCase)).ToList()
+            : raw.ToList();
+
+        filtered.Sort((a, b) => _sortDir == "desc"
+            ? b.PriorityScore.CompareTo(a.PriorityScore)
+            : a.PriorityScore.CompareTo(b.PriorityScore));
+
+        return filtered.Select(BuildRow).ToList();
+    }
+
+    private WaitlistRowVm BuildRow(WaitlistEntryDto e)
+    {
+        var location = e.PreferredLocationName ?? string.Empty;
+        var text = string.IsNullOrEmpty(location)
+            ? e.PreferredDepartmentName
+            : $"{e.PreferredDepartmentName} — {location}";
+        return new WaitlistRowVm
+        {
+            Entry = e,
+            SwimlaneKey = e.PreferredDepartmentId,
+            SwimlaneText = text,
+        };
+    }
+
+    private async Task OnDepartmentChangedAfter()
+    {
+        await LoadWaitlistAsync();
+    }
+
+    private void OnUrgencyChangedAfter()
+    {
+        UpdateItems();
+    }
+
+    private void OnSortChangedAfter()
+    {
+        UpdateItems();
+    }
+
+    private void ClearUrgencyFilter()
+    {
+        _urgencyFilter = string.Empty;
+        UpdateItems();
+    }
+
+    private void OnCardClick(Syncfusion.Blazor.Kanban.CardClickEventArgs<WaitlistRowVm> args)
+    {
+        _selectedEntry = args.Data?.Entry;
+        _aiOpen = false;
+    }
+
+    private async void OnDragStop(Syncfusion.Blazor.Kanban.DragEventArgs<WaitlistRowVm> args)
+    {
+        var dropped = args.Data is { Count: > 0 } ? args.Data![0] : null;
+        if (dropped is null) return;
+
+        var entry = dropped.Entry;
+        if (string.Equals(entry.Status, "Matched", StringComparison.OrdinalIgnoreCase))
+        {
+            args.Cancel = true;
+            _slotEntry = entry;
+            _selectedEntry = null;
+        }
+        else
+        {
+            args.Cancel = true;
+            _error = "Direct status changes are not supported via the board; use the slot matcher or remove the entry.";
+        }
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void CloseSelectedEntry()
+    {
+        _selectedEntry = null;
+    }
+
+    private void OpenSlotMatchForSelected()
+    {
+        if (_selectedEntry is null) return;
+        _slotEntry = _selectedEntry;
+    }
+
+    private async Task RemoveSelectedAsync()
+    {
+        if (_selectedEntry is null) return;
+        _removing = true;
+        try
+        {
+            var res = await WaitlistService.RemoveEntryAsync(_selectedEntry.WaitlistId);
+            if (res.IsOk)
+            {
+                _selectedEntry = null;
+                await LoadWaitlistAsync();
+            }
+            else
+            {
+                _error = res.Error?.Title ?? "Failed to remove waitlist entry.";
+            }
+        }
+        finally
+        {
+            _removing = false;
+        }
+    }
+
+    private void CloseSlotMatch()
+    {
+        _slotEntry = null;
+        _ = LoadWaitlistAsync();
+    }
+
+    private async Task OnSlotMatched()
+    {
+        _slotEntry = null;
+        _selectedEntry = null;
+        await LoadWaitlistAsync();
+    }
+
+    private async Task RunAiOptimizationAsync()
+    {
+        _aiLoading = true;
+        _aiOpen = true;
+        _selectedEntry = null;
+        _aiVersion++;
+        try
+        {
+            var request = new ScheduleOptimizationRequest
+            {
+                DepartmentId = string.IsNullOrEmpty(_departmentFilter) ? null : _departmentFilter,
+            };
+            var res = await AiService.ScheduleOptimizationAsync(request);
+            _aiResult = res.IsOk ? res.Data : null;
+        }
+        catch
+        {
+            _aiResult = null;
+        }
+        finally
+        {
+            _aiLoading = false;
+            _aiVersion++;
+        }
+    }
+
+    private void CloseAiPanel()
+    {
+        _aiOpen = false;
+    }
+
+    private RenderFragment RenderAiBanner() => (__builder) =>
+    {
+        if (_aiLoading)
+        {
+            <div class="waitlist-ai-loading">
+                <div class="waitlist-ai-loading-title">Analyzing schedule gaps…</div>
+                <SfProgressBar Type="ProgressType.Linear"
+                               Height="6"
+                               Width="100%"
+                               IsIndeterminate="true"
+                               TrackColor="var(--color-sf-bg-quaternary)"
+                               ProgressColor="var(--color-sf-bg-brand-solid)"
+                               CornerRadius="CornerType.Round">
+                    <ProgressBarAnimation Enable="true" Duration="1200"></ProgressBarAnimation>
+                </SfProgressBar>
+            </div>
+            return;
+        }
+
+        if (_aiResult is null)
+        {
+            <EmptyState Title="Ready to optimize"
+                        Description="Run Optimize Schedule to surface gaps you can fill from the waitlist." />
+            return;
+        }
+
+        if (_aiResult.Suggestions.Count == 0)
+        {
+            <EmptyState Title="No opportunities found"
+                        Description="The current schedule has no gaps that the waitlist can fill right now." />
+            return;
+        }
+
+        var badge = ConfidenceBadge(_aiResult.Confidence);
+        <div class="waitlist-ai-banner">
+            <div class="waitlist-ai-confidence">
+                <span class="waitlist-ai-confidence-pill" style="@($"background:{badge.Bg};color:{badge.Color};")">@badge.Label</span>
+                <div class="waitlist-ai-explanation">@_aiResult.Explanation</div>
+            </div>
+
+            @foreach (var s in _aiResult.Suggestions)
+            {
+                var local = s;
+                <div class="waitlist-ai-suggestion">
+                    <div class="waitlist-ai-suggestion-title">@(SuggestionTypeLabel.TryGetValue(local.Type, out var label) ? label : local.Type)</div>
+                    <div class="waitlist-ai-suggestion-meta">@local.ProviderName · @FormatTime(local.ProposedStart) – @FormatTime(local.ProposedEnd)</div>
+                    <div class="waitlist-ai-suggestion-reason">@local.Reason</div>
+                    <div class="waitlist-ai-suggestion-impact">
+                        ▲ Utilisation +@((local.EstimatedUtilizationGain * 100).ToString("F0"))% · No-show −@((local.EstimatedNoShowReduction * 100).ToString("F0"))%
+                    </div>
+                    @if (local.WaitlistMatches.Count > 0)
+                    {
+                        <div class="waitlist-ai-matches">
+                            <div class="waitlist-ai-matches-title">Suggested patients:</div>
+                            @foreach (var m in local.WaitlistMatches)
+                            {
+                                <div class="waitlist-ai-match-row">
+                                    <span>@m.PatientName</span>
+                                    <span>@((m.FitScore * 100).ToString("F0"))% fit</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    <div class="waitlist-ai-suggestion-actions">
+                        <SfButton CssClass="e-success e-small" OnClick="@(() => AcceptSuggestion(local))">Accept</SfButton>
+                        <SfButton CssClass="e-outline e-small" OnClick="@(() => StartEdit(local))">Edit</SfButton>
+                        <SfButton CssClass="e-danger e-small e-outline" OnClick="@(() => RejectSuggestion(local))">Reject</SfButton>
+                    </div>
+                </div>
+            }
+        </div>
+    };
+
+    private void AcceptSuggestion(ScheduleOptimizationSuggestionDto suggestion)
+    {
+        if (_aiResult is null) return;
+        _aiResult = new ScheduleOptimizationDto
+        {
+            Suggestions = _aiResult.Suggestions.Where(x => x != suggestion).ToList(),
+            Confidence = _aiResult.Confidence,
+            Explanation = _aiResult.Explanation,
+        };
+        _aiVersion++;
+        _ = LoadWaitlistAsync();
+    }
+
+    private void RejectSuggestion(ScheduleOptimizationSuggestionDto suggestion)
+    {
+        if (_aiResult is null) return;
+        _aiResult = new ScheduleOptimizationDto
+        {
+            Suggestions = _aiResult.Suggestions.Where(x => x != suggestion).ToList(),
+            Confidence = _aiResult.Confidence,
+            Explanation = _aiResult.Explanation,
+        };
+        _aiVersion++;
+    }
+
+    private void StartEdit(ScheduleOptimizationSuggestionDto suggestion)
+    {
+        _editing = new EditState
+        {
+            Suggestion = suggestion,
+            Start = ParseDate(suggestion.ProposedStart) ?? DateTime.Now,
+            End = ParseDate(suggestion.ProposedEnd) ?? DateTime.Now.AddMinutes(30),
+        };
+    }
+
+    private void OnEditStartChanged(Syncfusion.Blazor.Calendars.ChangedEventArgs<DateTime> args)
+    {
+        if (_editing is null) return;
+        if (args.Value != default) _editing.Start = args.Value;
+    }
+
+    private void OnEditEndChanged(Syncfusion.Blazor.Calendars.ChangedEventArgs<DateTime> args)
+    {
+        if (_editing is null) return;
+        if (args.Value != default) _editing.End = args.Value;
+    }
+
+    private void CancelEdit()
+    {
+        _editing = null;
+    }
+
+    private void SaveEdit()
+    {
+        if (_editing is null || _aiResult is null) return;
+        var updated = _editing.Suggestion.WithProposedTimes(
+            _editing.Start.ToString("o"),
+            _editing.End.ToString("o"));
+        _aiResult = new ScheduleOptimizationDto
+        {
+            Suggestions = _aiResult.Suggestions.Select(x => x == _editing.Suggestion ? updated : x).ToList(),
+            Confidence = _aiResult.Confidence,
+            Explanation = _aiResult.Explanation,
+        };
+        _editing = null;
+        _aiVersion++;
+    }
+
+    private static (string Label, string Bg, string Color) ConfidenceBadge(double confidence)
+    {
+        if (confidence >= 0.8) return ("High confidence", "var(--color-sf-bg-success-primary)", "var(--color-sf-fg-success-primary)");
+        if (confidence >= 0.5) return ("Medium confidence", "var(--color-sf-bg-warning-primary)", "var(--color-sf-fg-warning-primary)");
+        return ("Low confidence", "var(--color-sf-bg-error-primary)", "var(--color-sf-fg-error-primary)");
+    }
+
+    private static DateTime? ParseDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return DateTime.TryParse(value, out var d) ? d : null;
+    }
+
+    private static string FormatDate(string? value)
+    {
+        return DateFormats.FormatDate(value);
+    }
+
+    private static string DaysWaiting(string? value)
+    {
+        var d = ParseDate(value);
+        if (d is null) return "0d";
+        var days = Math.Max(0, (int)Math.Floor((DateTime.UtcNow - d.Value).TotalDays));
+        return $"{days}d";
+    }
+
+    private static string FormatTime(string? value)
+    {
+        return DateFormats.FormatTime(value);
+    }
+
+    private sealed class DepartmentOption
+    {
+        public string DepartmentId { get; set; } = string.Empty;
+        public string DepartmentName { get; set; } = string.Empty;
+        public string LocationName { get; set; } = string.Empty;
+        public string DisplayLabel { get; set; } = string.Empty;
+    }
+
+    private sealed class UrgencyOption
+    {
+        public string Text { get; set; } = string.Empty;
+        public string Id { get; set; } = string.Empty;
+    }
+
+    private sealed class SortOption
+    {
+        public string Text { get; set; } = string.Empty;
+        public string Id { get; set; } = string.Empty;
+    }
+
+    private sealed class EditState
+    {
+        public ScheduleOptimizationSuggestionDto Suggestion { get; set; } = default!;
+        public DateTime Start { get; set; }
+        public DateTime End { get; set; }
+    }
+
+    private sealed class WaitlistRowVm
+    {
+        public WaitlistEntryDto Entry { get; set; } = default!;
+        public string SwimlaneKey { get; set; } = string.Empty;
+        public string SwimlaneText { get; set; } = string.Empty;
+    }
+}

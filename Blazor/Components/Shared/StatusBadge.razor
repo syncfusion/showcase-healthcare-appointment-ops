@@ -1,0 +1,29 @@
+@code {
+    [Parameter] public string Status { get; set; } = string.Empty;
+
+    private static readonly Dictionary<string, (string Bg, string Color)> Palette = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Scheduled"] = ("var(--color-sf-bg-brand-primary)", "var(--color-sf-fg-brand-primary)"),
+        ["Confirmed"] = ("var(--color-sf-bg-success-primary)", "var(--color-sf-fg-success-primary)"),
+        ["CheckedIn"] = ("var(--color-sf-bg-warning-primary)", "var(--color-sf-fg-warning-primary)"),
+        ["InProgress"] = ("var(--color-sf-bg-info-primary)", "var(--color-sf-fg-info-primary)"),
+        ["Completed"] = ("var(--color-sf-bg-success-primary)", "var(--color-sf-fg-success-primary)"),
+        ["Cancelled"] = ("var(--color-sf-bg-error-primary)", "var(--color-sf-fg-error-primary)"),
+        ["NoShow"] = ("var(--color-sf-bg-tertiary)", "var(--color-sf-fg-secondary)"),
+        ["Open"] = ("var(--color-sf-bg-brand-primary)", "var(--color-sf-fg-brand-primary)"),
+        ["Matched"] = ("var(--color-sf-bg-success-primary)", "var(--color-sf-fg-success-primary)"),
+        ["ClosedExpired"] = ("var(--color-sf-bg-tertiary)", "var(--color-sf-fg-secondary)"),
+        ["ClosedCancelled"] = ("var(--color-sf-bg-error-primary)", "var(--color-sf-fg-error-primary)"),
+        ["Routine"] = ("var(--color-sf-bg-brand-primary)", "var(--color-sf-fg-brand-primary)"),
+        ["Urgent"] = ("var(--color-sf-bg-warning-primary)", "var(--color-sf-fg-warning-primary)"),
+        ["Emergency"] = ("var(--color-sf-bg-error-primary)", "var(--color-sf-fg-error-primary)"),
+        ["Active"] = ("var(--color-sf-bg-success-primary)", "var(--color-sf-fg-success-primary)"),
+        ["Inactive"] = ("var(--color-sf-bg-tertiary)", "var(--color-sf-fg-secondary)")
+    };
+
+    private (string Bg, string Color) Style => Palette.TryGetValue(Status, out var value) ? value : ("var(--color-sf-bg-tertiary)", "var(--color-sf-fg-secondary)");
+}
+
+<span style="display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: @Style.Bg; color: @Style.Color;">
+    @Status
+</span>

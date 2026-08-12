@@ -1,0 +1,212 @@
+@inject ProviderService ProviderService
+@inject ReferenceDataService ReferenceDataService
+@inject AppointmentService AppointmentService
+
+@if (Visible)
+{
+    <SfDialog Width="520px" IsModal="true" ShowCloseIcon="true" Header="Book Appointment" Visible="true"
+              Close="@(EventCallback.Factory.Create<Syncfusion.Blazor.Popups.CloseEventArgs>(this, args => OnClose.InvokeAsync()))">
+        <DialogButtons>
+            <DialogButton Content="@(_submitting ? "Saving…" : "Book")" IsPrimary="true" Disabled="_submitting"
+                          OnClick="@(EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.MouseEventArgs>(this, args => SubmitAsync()))" />
+            <DialogButton Content="Cancel" CssClass="e-flat"
+                          OnClick="@(EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.MouseEventArgs>(this, args => OnClose.InvokeAsync()))" />
+        </DialogButtons>
+
+        <div class="book-appt-form">
+            <div>
+                <label class="book-appt-label">Provider</label>
+                <SfDropDownList TValue="string" TItem="ProviderOption"
+                                DataSource="@_providerOptions"
+                                Value="@_providerId"
+                                SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending"
+                                Placeholder="Select provider">
+                    <DropDownListFieldSettings Text="Display" Value="ProviderId" />
+                    <DropDownListEvents TValue="string" TItem="ProviderOption" ValueChange="@(args => _providerId = args.Value ?? string.Empty)" />
+                </SfDropDownList>
+            </div>
+            <div class="book-appt-grid-2">
+                <div>
+                    <label class="book-appt-label">Department</label>
+                    <SfDropDownList TValue="string" TItem="DepartmentOption"
+                                    DataSource="@_departmentOptions"
+                                    Value="@_departmentId"
+                                    SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending"
+                                    Placeholder="Select">
+                        <DropDownListFieldSettings Text="DisplayLabel" Value="DepartmentId" />
+                        <DropDownListEvents TValue="string" TItem="DepartmentOption" ValueChange="@(args => _departmentId = args.Value ?? string.Empty)" />
+                    </SfDropDownList>
+                </div>
+                <div>
+                    <label class="book-appt-label">Location</label>
+                    <SfDropDownList TValue="string" TItem="LocationDto"
+                                    DataSource="@_locations"
+                                    Value="@_locationId"
+                                    SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending"
+                                    Placeholder="Select">
+                        <DropDownListFieldSettings Text="LocationName" Value="LocationId" />
+                        <DropDownListEvents TValue="string" TItem="LocationDto" ValueChange="@(args => _locationId = args.Value ?? string.Empty)" />
+                    </SfDropDownList>
+                </div>
+            </div>
+            <div class="book-appt-grid-2">
+                <div>
+                    <label class="book-appt-label">Type</label>
+                    <SfDropDownList TValue="string" TItem="string"
+                                    DataSource="@AppointmentTypes"
+                                    Value="@_appointmentType"
+                                    SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending">
+                        <DropDownListEvents TValue="string" TItem="string" ValueChange="@(args => _appointmentType = args.Value ?? "Consultation")" />
+                    </SfDropDownList>
+                </div>
+                <div>
+                    <label class="book-appt-label">Duration (min)</label>
+                    <SfDropDownList TValue="int" TItem="int"
+                                    DataSource="@Durations"
+                                    Value="@_durationMinutes"
+                                    SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending">
+                        <DropDownListEvents TValue="int" TItem="int" ValueChange="@(args => _durationMinutes = args.Value)" />
+                    </SfDropDownList>
+                </div>
+            </div>
+            <div>
+                <label class="book-appt-label">Date / Time</label>
+                <SfDateTimePicker TValue="DateTime?"
+                                  @bind-Value="_scheduled"
+                                  Format="MMM d, yyyy h:mm a" />
+            </div>
+            <div>
+                <label class="book-appt-label">Reason for Visit</label>
+                <SfTextBox Multiline="true"
+                           Value="@_reason"
+                           ValueChanged="@(EventCallback.Factory.Create<string>(this, v => _reason = v ?? string.Empty))" />
+            </div>
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div style="color: var(--color-sf-fg-error-primary); font-size: 13px;">@_error</div>
+            }
+        </div>
+    </SfDialog>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string PatientId { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnCreated { get; set; }
+
+    private static readonly List<string> AppointmentTypes = new() { "Consultation", "Follow-up", "Telehealth", "Procedure", "Lab Visit", "Vaccination" };
+    private static readonly List<int> Durations = new() { 15, 30, 45, 60 };
+
+    private List<ProviderOption> _providerOptions = new();
+    private List<DepartmentOption> _departmentOptions = new();
+    private List<LocationDto> _locations = new();
+    private string _providerId = string.Empty;
+    private string _departmentId = string.Empty;
+    private string _locationId = string.Empty;
+    private string _appointmentType = "Consultation";
+    private DateTime? _scheduled;
+    private int _durationMinutes = 30;
+    private string _reason = string.Empty;
+    private bool _submitting;
+    private string? _error;
+    private bool _wasVisible;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Visible && !_wasVisible)
+        {
+            _wasVisible = true;
+            _providerId = string.Empty;
+            _departmentId = string.Empty;
+            _locationId = string.Empty;
+            _appointmentType = "Consultation";
+            _scheduled = DateTime.Now.AddHours(1);
+            _durationMinutes = 30;
+            _reason = string.Empty;
+            _error = null;
+
+            var providersTask = ProviderService.GetProvidersAsync();
+            var departmentsTask = ReferenceDataService.GetDepartmentsAsync();
+            var locationsTask = ReferenceDataService.GetLocationsAsync();
+            await Task.WhenAll(providersTask, departmentsTask, locationsTask);
+
+            if (providersTask.Result.IsOk && providersTask.Result.Data is not null)
+            {
+                _providerOptions = providersTask.Result.Data
+                    .Select(p => new ProviderOption
+                    {
+                        ProviderId = p.ProviderId,
+                        Display = $"{p.FirstName} {p.LastName} ({p.Specialty})"
+                    })
+                    .ToList();
+            }
+            if (departmentsTask.Result.IsOk && departmentsTask.Result.Data is not null)
+            {
+                _departmentOptions = departmentsTask.Result.Data
+                    .Select(d => new DepartmentOption
+                    {
+                        DepartmentId = d.DepartmentId,
+                        DisplayLabel = string.IsNullOrEmpty(d.LocationName) ? d.DepartmentName : $"{d.DepartmentName} — {d.LocationName}"
+                    })
+                    .ToList();
+            }
+            if (locationsTask.Result.IsOk && locationsTask.Result.Data is not null)
+                _locations = locationsTask.Result.Data;
+        }
+        else if (!Visible)
+        {
+            _wasVisible = false;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_submitting) return;
+        if (string.IsNullOrEmpty(_providerId) || string.IsNullOrEmpty(_departmentId) || string.IsNullOrEmpty(_locationId))
+        {
+            _error = "Please select provider, department, and location.";
+            return;
+        }
+        _submitting = true;
+        _error = null;
+        try
+        {
+            var result = await AppointmentService.CreateAppointmentAsync(new CreateAppointmentRequest
+            {
+                PatientId = PatientId,
+                ProviderId = _providerId,
+                DepartmentId = _departmentId,
+                LocationId = _locationId,
+                AppointmentType = _appointmentType,
+                ScheduledDateTime = (_scheduled ?? DateTime.Now).ToUniversalTime().ToString("O"),
+                DurationMinutes = _durationMinutes,
+                ReasonForVisit = _reason
+            });
+            if (result.IsOk)
+                await OnCreated.InvokeAsync();
+            else
+                _error = result.Error?.Detail ?? result.Error?.Title ?? "Failed to create appointment.";
+        }
+        catch
+        {
+            _error = "Failed to create appointment. Please try again.";
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class ProviderOption
+    {
+        public string ProviderId { get; set; } = string.Empty;
+        public string Display { get; set; } = string.Empty;
+    }
+
+    private class DepartmentOption
+    {
+        public string DepartmentId { get; set; } = string.Empty;
+        public string DisplayLabel { get; set; } = string.Empty;
+    }
+}

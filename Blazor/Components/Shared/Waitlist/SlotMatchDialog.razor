@@ -1,0 +1,278 @@
+
+@using Syncfusion.Blazor.Popups
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Calendars
+@inject WaitlistService WaitlistService
+@inject ProviderService ProviderService
+@inject AppointmentService AppointmentService
+
+<SfDialog Width="480px"
+          IsModal="true"
+          ShowCloseIcon="true"
+          Target="body"
+          Header="@($"Match slot — {Entry.PatientName}")"
+          Visible="true"
+          Closed="OnClosed">
+    <div class="slotmatch-body">
+        <div class="slotmatch-summary">
+            @Entry.RequestedAppointmentType · @Entry.PreferredDepartmentName · preferred @FormatDate(Entry.PreferredDateRangeStart) – @FormatDate(Entry.PreferredDateRangeEnd)
+        </div>
+
+        <div class="slotmatch-controls">
+            <div class="slotmatch-field slotmatch-field-provider">
+                <label>Provider</label>
+                <SfDropDownList TValue="string"
+                                TItem="ProviderSummaryDto"
+                                Placeholder="Select provider"
+                                DataSource="@_providers"
+                                Value="@_providerId"
+                                SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending">
+                    <DropDownListFieldSettings Text="LastName" Value="ProviderId" />
+                    <DropDownListTemplates TItem="ProviderSummaryDto">
+                        <ItemTemplate Context="p">
+                            <span>@($"{p.Title} {p.FirstName} {p.LastName}")</span>
+                        </ItemTemplate>
+                    </DropDownListTemplates>
+                    <DropDownListEvents TValue="string" TItem="ProviderSummaryDto" ValueChange="OnProviderChanged" />
+                </SfDropDownList>
+            </div>
+            <div class="slotmatch-field slotmatch-field-date">
+                <label>Date</label>
+                <SfDatePicker TValue="DateTime"
+                              Value="@_date"
+                              Min="@_minDate"
+                              Max="@_maxDate">
+                    <DatePickerEvents TValue="DateTime" ValueChange="OnDateChanged" />
+                </SfDatePicker>
+            </div>
+            <div class="slotmatch-field slotmatch-field-action">
+                <SfButton CssClass="e-primary" Disabled="@_finding" OnClick="FindSlotsAsync">
+                    @(_finding ? "Finding…" : "Find slots")
+                </SfButton>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="slotmatch-error">
+                <ErrorBanner Message="@_error" />
+            </div>
+        }
+
+        <div class="slotmatch-slots">
+            @if (_finding)
+            {
+                <LoadingState Inline="true" Label="Loading available slots…" />
+            }
+            else if (_slots.Count == 0)
+            {
+                <div class="slotmatch-empty">
+                    No available slots for this provider and date. Try another date.
+                </div>
+            }
+            else
+            {
+                <div class="slotmatch-grid">
+                    @foreach (var s in _slots)
+                    {
+                        var selected = _selectedSlot is not null && _selectedSlot.SlotStart == s.SlotStart;
+                        <button type="button"
+                                class="slotmatch-slot@(selected ? " is-selected" : "")"
+                                @onclick="@(args => SelectSlot(s))">
+                            @FormatTime(s.SlotStart)
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="slotmatch-footer">
+            <SfButton CssClass="e-outline" Disabled="@_submitting" OnClick="TriggerCloseAsync">Cancel</SfButton>
+            <SfButton CssClass="e-success"
+                      Disabled="@(_selectedSlot is null || _submitting)"
+                      OnClick="ConfirmMatchAsync">
+                @(ConfirmLabel)
+            </SfButton>
+        </div>
+    </div>
+</SfDialog>
+
+@code {
+    [Parameter] public WaitlistEntryDto Entry { get; set; } = default!;
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnMatched { get; set; }
+
+    private List<ProviderSummaryDto> _providers = new();
+    private string _providerId = string.Empty;
+    private DateTime _date;
+    private DateTime _minDate;
+    private DateTime _maxDate;
+    private List<SlotDto> _slots = new();
+    private SlotDto? _selectedSlot;
+    private bool _finding;
+    private bool _submitting;
+    private string? _error;
+
+    private string ConfirmLabel =>
+        _submitting ? "Matching…" :
+        _selectedSlot is not null ? $"Confirm {FormatTime(_selectedSlot.SlotStart)}" :
+        "Confirm match";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _minDate = ParseDateOrToday(Entry.PreferredDateRangeStart);
+        _maxDate = ParseDateOrToday(Entry.PreferredDateRangeEnd);
+        _date = _minDate;
+        _providerId = Entry.PreferredProviderId ?? string.Empty;
+
+        try
+        {
+            var res = await ProviderService.GetProvidersAsync(
+                new PagingRequest { Offset = 0, Limit = 500 },
+                null,
+                Entry.PreferredDepartmentId,
+                null);
+            if (res.IsOk && res.Data is not null)
+            {
+                _providers = res.Data.Items;
+                if (string.IsNullOrEmpty(_providerId) && _providers.Count > 0)
+                    _providerId = _providers[0].ProviderId;
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task OnProviderChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, ProviderSummaryDto> args)
+    {
+        _providerId = args.Value ?? string.Empty;
+        _slots = new();
+        _selectedSlot = null;
+        await Task.CompletedTask;
+    }
+
+    private async Task OnDateChanged(Syncfusion.Blazor.Calendars.ChangedEventArgs<DateTime> args)
+    {
+        if (args.Value != default)
+            _date = args.Value;
+        _slots = new();
+        _selectedSlot = null;
+        await Task.CompletedTask;
+    }
+
+    private async Task FindSlotsAsync()
+    {
+        if (string.IsNullOrEmpty(_providerId))
+        {
+            _error = "Select a provider first.";
+            return;
+        }
+        _finding = true;
+        _error = null;
+        _selectedSlot = null;
+        _slots = new();
+        try
+        {
+            var iso = _date.ToString("yyyy-MM-dd");
+            var res = await ProviderService.GetAvailableSlotsAsync(_providerId, iso);
+            if (res.IsOk && res.Data is not null)
+                _slots = res.Data.Where(s => s.IsAvailable).ToList();
+            else
+                _error = res.Error?.Title ?? "Could not load availability.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _finding = false;
+        }
+    }
+
+    private void SelectSlot(SlotDto slot)
+    {
+        _selectedSlot = slot;
+    }
+
+    private async Task ConfirmMatchAsync()
+    {
+        if (_selectedSlot is null) return;
+        _submitting = true;
+        _error = null;
+        try
+        {
+            var slot = _selectedSlot;
+            var durationMinutes = Math.Max(15, (int)Math.Round((ParseDate(slot.SlotEnd) - ParseDate(slot.SlotStart))?.TotalMinutes ?? 30));
+
+            var created = await AppointmentService.CreateAppointmentAsync(new CreateAppointmentRequest
+            {
+                PatientId = Entry.PatientId,
+                ProviderId = slot.ProviderId,
+                DepartmentId = Entry.PreferredDepartmentId,
+                LocationId = slot.LocationId,
+                AppointmentType = Entry.RequestedAppointmentType,
+                ScheduledDateTime = slot.SlotStart,
+                DurationMinutes = durationMinutes,
+                ReasonForVisit = $"Waitlist match — {Entry.RequestedAppointmentType}",
+            });
+
+            if (!created.IsOk || created.Data is null)
+            {
+                _error = created.Error?.Title ?? "Failed to create the appointment.";
+                return;
+            }
+
+            var matched = await WaitlistService.MatchEntryAsync(Entry.WaitlistId, created.Data.AppointmentId);
+            if (!matched.IsOk)
+            {
+                _error = matched.Error?.Title ?? "Appointment created but matching failed.";
+                return;
+            }
+
+            await OnMatched.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private async Task TriggerCloseAsync()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task OnClosed(Syncfusion.Blazor.Popups.CloseEventArgs args)
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private static DateTime ParseDateOrToday(string? value)
+    {
+        if (DateTime.TryParse(value, out var d)) return d.Date;
+        return DateTime.Today;
+    }
+
+    private static DateTime? ParseDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return DateTime.TryParse(value, out var d) ? d : null;
+    }
+
+    private static string FormatDate(string? value)
+    {
+        return DateFormats.FormatDate(value);
+    }
+
+    private static string FormatTime(string value)
+    {
+        return DateFormats.FormatTime(value);
+    }
+}

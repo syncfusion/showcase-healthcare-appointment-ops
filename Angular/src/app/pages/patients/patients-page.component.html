@@ -1,0 +1,81 @@
+<div class="patient-list">
+  @if (error(); as err) {
+    <app-error-banner title="Unable to load patients" [message]="err" (retry)="retry()"></app-error-banner>
+  }
+
+  @if (initialLoad() && loading()) {
+    <app-loading-state label="Loading patients…"></app-loading-state>
+  } @else if (empty()) {
+    <app-empty-state
+      title="No patients found"
+      description="Please try again.">
+    </app-empty-state>
+  } @else {
+    <ejs-grid
+      #grid
+      [dataSource]="items()"
+      [allowPaging]="true"
+      [allowSorting]="true"
+      [allowFiltering]="true"
+      [allowExcelExport]="true"
+      [filterSettings]="filterSettings"
+      [pageSettings]="pageSettings"
+      [toolbar]="toolbar"
+      [showColumnChooser]="true"
+      [searchSettings]="searchSettings"
+      cssClass="patient-grid"
+      (rowSelected)="onRowSelected($event.data)">
+      <e-columns>
+        <e-column field="lastName" headerText="Patient" width="260">
+          <ng-template #template let-data>
+            <div class="patient-cell">
+              <span class="patient-avatar">{{ initials(data) }}</span>
+              <div class="patient-meta">
+                <div class="patient-name">{{ fullName(data) }}</div>
+                <div class="patient-subtitle">{{ patientSubline(data) }}</div>
+              </div>
+            </div>
+          </ng-template>
+        </e-column>
+        <e-column field="gender" headerText="Gender" width="100"></e-column>
+        <e-column field="phoneNumber" headerText="Phone" width="140"></e-column>
+        <e-column field="primaryCareProviderName" headerText="Primary Care Provider" width="180" hideAtMedia="(max-width: 1023px)"></e-column>
+        <e-column field="nextAppointmentDateTime" headerText="Upcoming Appointment" width="220">
+          <ng-template #template let-data>
+            @if (!data.nextAppointmentDateTime) {
+              <span class="cell-muted">—</span>
+            } @else {
+              <div class="appt-cell">
+                <span class="appt-date">{{ formatAppt(data.nextAppointmentDateTime) }}</span>
+                <div class="appt-meta">
+                  @if (data.nextAppointmentType) {
+                    <span class="appt-type">{{ data.nextAppointmentType }}</span>
+                  }
+                  @if (data.nextAppointmentStatus) {
+                    <app-status-badge [status]="data.nextAppointmentStatus"></app-status-badge>
+                  }
+                </div>
+              </div>
+            }
+          </ng-template>
+        </e-column>
+        <e-column field="isActive" headerText="Status" width="100" hideAtMedia="(max-width: 640px)">
+          <ng-template #template let-data>
+            <app-status-badge [status]="data.isActive ? 'Active' : 'Inactive'"></app-status-badge>
+          </ng-template>
+        </e-column>
+        <e-column headerText="Actions" width="110" [allowFiltering]="false" [allowSorting]="false">
+          <ng-template #template let-data>
+            <button
+              ejs-button
+              cssClass="e-flat e-primary e-small"
+              class="view-btn"
+              (click)="goToDetail(data.patientId)">
+              View
+            </button>
+          </ng-template>
+        </e-column>
+      </e-columns>
+    </ejs-grid>
+  }
+</div>

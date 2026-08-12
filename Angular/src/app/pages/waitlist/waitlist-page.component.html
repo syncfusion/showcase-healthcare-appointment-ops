@@ -1,0 +1,190 @@
+<div class="waitlist-root" [class.waitlist-root--ai-open]="aiOpen() || !!selectedEntry()" [class.is-mobile]="isMobile()">
+  <div class="board-col">
+    <div class="filters">
+      <div class="filter-field filter-field--dept">
+        <ejs-dropdownlist
+          cssClass="dept-group-ddl"
+          [dataSource]="departmentOptions()"
+          [fields]="departmentFields"
+          placeholder="All Departments"
+          [allowFiltering]="true"
+          [showClearButton]="true"
+          [sortOrder]="'Ascending'"
+          width="100%"
+          [value]="departmentFilter()"
+          (change)="onDepartmentChange($event.value)">
+        </ejs-dropdownlist>
+      </div>
+      <div class="filter-field filter-field--urgency">
+        <ejs-dropdownlist
+          [dataSource]="urgencyOptions"
+          [fields]="urgencyFields"
+          [value]="urgencyFilter()"
+          [sortOrder]="'Ascending'"
+          width="100%"
+          (change)="onUrgencyChange($event.value)">
+        </ejs-dropdownlist>
+      </div>
+      <div class="filter-field filter-field--sort">
+        <ejs-dropdownlist
+          [dataSource]="sortOptions"
+          [fields]="sortFields"
+          [value]="sortDir()"
+          [sortOrder]="'Ascending'"
+          width="100%"
+          (change)="onSortChange($event.value)">
+        </ejs-dropdownlist>
+      </div>
+      <button ejs-button cssClass="e-primary" iconCss="e-icons e-assistview-icon" [disabled]="aiLoading()" (click)="runAi()">
+        {{ aiLoading() ? 'Optimizing…' : 'Optimize Schedule' }}
+      </button>
+    </div>
+
+    @if (error(); as err) {
+      <app-error-banner [message]="err" (retry)="retry()"></app-error-banner>
+    }
+
+    @if (loading() && items().length === 0) {
+      <app-loading-state label="Loading waitlist…"></app-loading-state>
+    } @else if (items().length === 0) {
+      <app-empty-state
+        [title]="urgencyFilter() ? 'No matching entries' : 'Waitlist is empty'"
+        [description]="urgencyFilter() ? 'No waitlist entries match the selected urgency.' : 'No patients are currently waiting for appointments.'"
+        [actionLabel]="urgencyFilter() ? 'Clear filter' : undefined"
+        (action)="clearUrgencyFilter()">
+      </app-empty-state>
+    } @else {
+      <div class="kanban-wrap" [class.is-mobile]="isMobile()">
+        <ejs-kanban
+          cssClass="waitlist-kanban"
+          [dataSource]="items()"
+          keyField="status"
+          [cardSettings]="cardSettings"
+          [sortSettings]="sortSettings"
+          [swimlaneSettings]="swimlaneSettings"
+          [allowDragAndDrop]="!isMobile()"
+          width="100%"
+          height="100%"
+          (cardClick)="onCardClick($event)"
+          (dragStop)="onDragStop($event)">
+          <e-columns>
+            <e-column headerText="Open" keyField="Open"></e-column>
+            <e-column headerText="Matched" keyField="Matched"></e-column>
+            <e-column headerText="Closed Expired" keyField="ClosedExpired,Expired"></e-column>
+            <e-column headerText="Closed Cancelled" keyField="ClosedCancelled,Cancelled"></e-column>
+          </e-columns>
+          <ng-template #cardSettingsTemplate let-data="">
+            <div class="wl-card">
+              <div class="wl-card-name">{{ data.patientName }}</div>
+              <div class="wl-card-sub">{{ data.requestedAppointmentType }} • Priority {{ data.priorityScore }}</div>
+              @if (data.preferredProviderName) {
+                <div class="wl-card-sub">{{ data.preferredProviderName }}</div>
+              }
+              <div class="wl-card-badges">
+                <app-status-badge [status]="data.urgencyLevel"></app-status-badge>
+                <span class="wl-waiting">{{ daysWaiting(data.requestDateTime) }}d waiting</span>
+              </div>
+              <div class="wl-card-range">{{ formatDateRange(data.preferredDateRangeStart, data.preferredDateRangeEnd) }}</div>
+            </div>
+          </ng-template>
+        </ejs-kanban>
+      </div>
+    }
+  </div>
+
+  @if (aiOpen()) {
+    <div class="ai-col">
+      <div class="ai-panel-header">Schedule Optimizer</div>
+      <ejs-aiassistview cssClass="waitlist-ai" width="100%" height="100%">
+        <ng-template #bannerTemplate>
+          @if (aiLoading()) {
+            <div class="ai-banner ai-banner--loading">
+              <div class="ai-loading-label">Analyzing schedule gaps…</div>
+              <div class="ai-progress" role="progressbar" aria-label="Analyzing schedule"></div>
+            </div>
+          } @else if (!aiResult()) {
+            <app-empty-state title="Ready to optimise" description="Run Optimize Schedule to surface gaps you can fill from the waitlist."></app-empty-state>
+          } @else if (aiResult()!.suggestions.length === 0) {
+            <app-empty-state title="No opportunities found" description="The current schedule has no gaps that the waitlist can fill right now."></app-empty-state>
+          } @else {
+            <div class="ai-suggestions">
+              <div class="ai-confidence" [title]="(aiResult()!.confidence * 100).toFixed(0) + '% model confidence'">
+                @if (confidenceBadge(aiResult()!.confidence); as badge) {
+                  <span class="ai-confidence-pill" [style.background]="badge.bg" [style.color]="badge.color">{{ badge.label }}</span>
+                }
+                <div class="ai-confidence-text">{{ aiResult()!.explanation }}</div>
+              </div>
+              @for (s of aiResult()!.suggestions; track s) {
+                <div class="ai-suggestion">
+                  <div class="ai-suggestion-type">{{ suggestionTypeLabel[s.type] ?? s.type }}</div>
+                  <div class="ai-suggestion-meta">{{ s.providerName }} • {{ fmtTime(s.proposedStart) }} – {{ fmtTime(s.proposedEnd) }}</div>
+                  <div class="ai-suggestion-reason">{{ s.reason }}</div>
+                  <div class="ai-suggestion-stats">▲ Utilisation +{{ (s.estimatedUtilizationGain * 100).toFixed(0) }}% · No-show −{{ (s.estimatedNoShowReduction * 100).toFixed(0) }}%</div>
+                  @if (s.waitlistMatches.length > 0) {
+                    <div class="ai-matches">
+                      <div class="ai-matches-label">Suggested patients:</div>
+                      @for (m of s.waitlistMatches; track m.waitlistId) {
+                        <div class="ai-match-row">
+                          <span>{{ m.patientName }}</span>
+                          <span>{{ (m.fitScore * 100).toFixed(0) }}% fit</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                  <div class="ai-suggestion-actions">
+                    <button ejs-button cssClass="e-success e-small" (click)="acceptSuggestion(s)">Accept</button>
+                    <button ejs-button cssClass="e-outline e-small" (click)="editSuggestion(s)">Edit</button>
+                    <button ejs-button cssClass="e-danger e-small e-outline" (click)="rejectSuggestion(s)">Reject</button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </ng-template>
+      </ejs-aiassistview>z
+      <button ejs-button cssClass="e-outline e-small ai-close" (click)="closeAi()">Close optimiser</button>
+    </div>
+  } @else if (selectedEntry(); as entry) {
+    <app-waitlist-entry-detail
+      [entry]="entry"
+      [removing]="removing()"
+      (close)="closeEntry()"
+      (findSlot)="findSlotForSelected()"
+      (remove)="removeSelected()">
+    </app-waitlist-entry-detail>
+  }
+
+  @if (slotEntry(); as slot) {
+    <app-slot-match-dialog
+      [entry]="slot"
+      (close)="closeSlotDialog()"
+      (matched)="onSlotMatched()">
+    </app-slot-match-dialog>
+  }
+
+  @if (editing()) {
+    <ejs-dialog
+      header="Edit suggestion"
+      [visible]="true"
+      width="380px"
+      [isModal]="true"
+      [showCloseIcon]="true"
+      (close)="cancelEdit()"
+      target=".waitlist-root">
+      <div class="edit-body">
+        <div class="edit-field">
+          <label class="edit-label">Proposed start</label>
+          <ejs-datetimepicker [value]="editStart" (change)="onEditStartChange($event.value)"></ejs-datetimepicker>
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Proposed end</label>
+          <ejs-datetimepicker [value]="editEnd" [min]="editMin" (change)="onEditEndChange($event.value)"></ejs-datetimepicker>
+        </div>
+        <div class="edit-actions">
+          <button ejs-button cssClass="e-outline" (click)="cancelEdit()">Cancel</button>
+          <button ejs-button cssClass="e-primary" (click)="saveEdit()">Save</button>
+        </div>
+      </div>
+    </ejs-dialog>
+  }
+</div>

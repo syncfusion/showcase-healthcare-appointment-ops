@@ -1,0 +1,115 @@
+
+@using Syncfusion.Blazor.Charts
+@using HealthcareAppointmentOps.Blazor.Services
+@using HealthcareAppointmentOps.Blazor.Components.Shared
+@inject ThemeService ThemeService
+@implements IDisposable
+
+<div class="provider-analytics-grid">
+    <div class="provider-analytics-card">
+        <div class="provider-analytics-title">Utilization Trend</div>
+        @if (UtilizationLoading)
+        {
+            <LoadingState Inline="true" Label="Loading utilization…" />
+        }
+        else if (!string.IsNullOrEmpty(UtilizationError))
+        {
+            <ErrorBanner Message="@UtilizationError" OnRetry="OnUtilizationRetry" />
+        }
+        else if (UtilizationData.Count == 0)
+        {
+            <EmptyState Title="No utilization data" Description="No appointments in the last 6 months." />
+        }
+        else
+        {
+            <div class="chart-fill-height">
+                <SfChart @key="@ChartThemeKey" Height="100%" Background="transparent" Theme="@ChartThemeValue">
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category"></ChartPrimaryXAxis>
+                    <ChartPrimaryYAxis Title="Utilization %" LabelFormat="{value}%"></ChartPrimaryYAxis>
+                    <ChartLegendSettings Visible="false" />
+                    <ChartTooltipSettings Enable="true" />
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="@UtilizationData"
+                                     XName="Month"
+                                     YName="Rate"
+                                     Name="Utilization %"
+                                     Type="ChartSeriesType.Spline"
+                                     Fill="@ChartPalette.SeriesTeal"
+                                     Width="3">
+                            <ChartMarker Visible="true" Height="8" Width="8" />
+                        </ChartSeries>
+                    </ChartSeriesCollection>
+                </SfChart>
+            </div>
+        }
+    </div>
+
+    <div class="provider-analytics-card">
+        <div class="provider-analytics-title">No-Show Rate Trend</div>
+        @if (!string.IsNullOrEmpty(DepartmentName))
+        {
+            <div class="provider-analytics-subtitle">Department-level trend (@DepartmentName)</div>
+        }
+        @if (NoShowLoading)
+        {
+            <LoadingState Inline="true" Label="Loading no-show trend…" />
+        }
+        else if (!string.IsNullOrEmpty(NoShowError))
+        {
+            <ErrorBanner Message="@NoShowError" OnRetry="OnNoShowRetry" />
+        }
+        else if (NoShowData.Count == 0)
+        {
+            <EmptyState Title="No no-show data" Description="No appointments in the last 6 months." />
+        }
+        else
+        {
+            <div class="chart-fill-height">
+                <SfChart @key="@ChartThemeKey" Height="100%" Background="transparent" Theme="@ChartThemeValue">
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category"></ChartPrimaryXAxis>
+                    <ChartPrimaryYAxis Title="No-Show %" LabelFormat="{value}%"></ChartPrimaryYAxis>
+                    <ChartLegendSettings Visible="false" />
+                    <ChartTooltipSettings Enable="true" />
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="@NoShowData"
+                                     XName="Month"
+                                     YName="Rate"
+                                     Name="No-Show %"
+                                     Type="ChartSeriesType.Column"
+                                     Fill="@ChartPalette.SeriesRose"
+                                     ColumnWidth="0.6">
+                            <ChartCornerRadius TopLeft="6" TopRight="6" />
+                        </ChartSeries>
+                    </ChartSeriesCollection>
+                </SfChart>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<TrendPoint> UtilizationData { get; set; } = Array.Empty<TrendPoint>();
+    [Parameter] public bool UtilizationLoading { get; set; }
+    [Parameter] public string? UtilizationError { get; set; }
+    [Parameter] public EventCallback OnUtilizationRetry { get; set; }
+
+    [Parameter] public IReadOnlyList<TrendPoint> NoShowData { get; set; } = Array.Empty<TrendPoint>();
+    [Parameter] public bool NoShowLoading { get; set; }
+    [Parameter] public string? NoShowError { get; set; }
+    [Parameter] public EventCallback OnNoShowRetry { get; set; }
+
+    [Parameter] public string? DepartmentName { get; set; }
+
+    private Syncfusion.Blazor.Theme ChartThemeValue => ChartTheme.Resolve(ThemeService.Resolved);
+    private string ChartThemeKey => ChartTheme.KeyFor(ThemeService.Resolved);
+
+    protected override void OnInitialized() => ThemeService.OnChange += OnThemeChanged;
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => ThemeService.OnChange -= OnThemeChanged;
+
+    public sealed class TrendPoint
+    {
+        public string Month { get; set; } = string.Empty;
+        public double Rate { get; set; }
+    }
+}

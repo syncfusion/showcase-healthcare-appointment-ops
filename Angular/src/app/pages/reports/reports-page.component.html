@@ -1,0 +1,177 @@
+<div class="reports">
+  @if (bannerError(); as err) {
+    <app-error-banner title="Unable to load analytics data" [message]="err" (retry)="retryAll()"></app-error-banner>
+  }
+
+  <div class="grid">
+    <section class="card filters">
+      <div class="field field--range">
+        <label class="field-label">Date Range</label>
+        <ejs-daterangepicker
+          placeholder="Select a date range"
+          [locale]="'en-US'"
+          [format]="'MMM d, yyyy'"
+          width="280px"
+          [showClearButton]="true"
+          [presets]="rangePresets"
+          [startDate]="startDate() ? toDate(startDate()) : null"
+          [endDate]="endDate() ? toDate(endDate()) : null"
+          (change)="onRangeChange($event)">
+        </ejs-daterangepicker>
+      </div>
+      <div class="field field--wide">
+        <label class="field-label">Department</label>
+        <ejs-dropdownlist
+          #deptDropDown
+          cssClass="dept-group-ddl"
+          [dataSource]="departmentOptions()"
+          [fields]="departmentFields"
+          placeholder="All Departments"
+          [allowFiltering]="true"
+          [showClearButton]="true"
+          [sortOrder]="'Ascending'"
+          [value]="departmentFilter()"
+          width="220px"
+          (change)="onDepartmentChange($event.value)">
+        </ejs-dropdownlist>
+      </div>
+      <div class="field-actions">
+        <button ejs-button cssClass="e-outline" (click)="resetFilters()">Reset</button>
+      </div>
+    </section>
+
+    @if (!filtersReady()) {
+      <section class="card card--full empty">
+        <app-empty-state
+          title="Select filters"
+          description="Choose a start date, end date, and department to view the analytics reports. Use Reset to clear your selection.">
+        </app-empty-state>
+      </section>
+    } @else {
+      <section class="card chart-card">
+        <h3 class="card-title">Appointment Volume Trend</h3>
+        <div [style.height]="chartFillHeight({ rows: 2, reserve: 300 })">
+          <ejs-chart
+            [theme]="chartTheme()"
+            [primaryXAxis]="categoryXAxis"
+            [primaryYAxis]="volumeYAxis"
+            [legendSettings]="legendSettings"
+            [tooltip]="tooltip"
+            height="100%">
+            <e-series-collection>
+              @for (s of volumeSeries; track s.type) {
+                <e-series
+                  type="Line"
+                  [dataSource]="volumeData()"
+                  xName="period"
+                  [yName]="s.type"
+                  [name]="s.type"
+                  [fill]="s.color"
+                  [width]="2"
+                  [marker]="s.marker">
+                </e-series>
+              }
+            </e-series-collection>
+          </ejs-chart>
+        </div>
+      </section>
+
+      <section class="card chart-card">
+        <h3 class="card-title">No-Show Rate Trend</h3>
+        <div [style.height]="chartFillHeight({ rows: 2, reserve: 300 })">
+          <ejs-chart
+            [theme]="chartTheme()"
+            [primaryXAxis]="categoryXAxis"
+            [primaryYAxis]="noShowYAxis()"
+            [legendSettings]="hiddenLegend"
+            [tooltip]="tooltip"
+            [selectionMode]="selectionMode"
+            [highlightMode]="highlightMode"
+            height="100%">
+            <e-series-collection>
+              <e-series
+                type="StepLine"
+                [dataSource]="noShowData()"
+                xName="period"
+                yName="rate"
+                name="No-Show %"
+                [fill]="seriesRose"
+                [width]="2.5"
+                [marker]="{ visible: true, width: 7, height: 7, fill: seriesRose, shape: 'Circle' }">
+              </e-series>
+            </e-series-collection>
+          </ejs-chart>
+        </div>
+      </section>
+
+      <section class="card chart-card">
+        <h3 class="card-title">{{ 'Provider Utilization (% vs ' + utilizationTarget + '% goal)' }}</h3>
+        <div #bulletChartWrap class="bullet-chart-wrap" [style.height]="bulletChartFillHeight({ rows: 2, reserve: 300 })">
+          @for (bulletKey of bulletChartRenderKey(); track bulletKey) {
+            <ejs-bulletchart
+              id="provider-utilization"
+              [theme]="chartTheme()"
+              [dataSource]="utilizationData()"
+              valueField="value"
+              targetField="target"
+              categoryField="category"
+              valueFill="color"
+              [valueHeight]="18"
+              type="Rect"
+              [targetTypes]="['Rect']"
+              [targetWidth]="5"
+              targetColor="var(--color-sf-fg-primary)"
+              [minimum]="0"
+              [maximum]="100"
+              [interval]="20"
+              [tooltip]="tooltip"
+              [dataLabel]="utilizationBulletDataLabel"
+              labelFormat="{value}%"
+              [margin]="utilizationBulletMargin"
+              [categoryLabelStyle]="utilizationBulletCategoryLabelStyle"
+              [labelStyle]="utilizationBulletLabelStyle"
+              [legendSettings]="hiddenLegend"
+              [animation]="{ enable: true, duration: 800 }"
+              [height]="bulletChartHeight()">
+              <e-bullet-range-collection>
+                @for (range of utilizationBulletRanges; track range.end) {
+                  <e-bullet-range [end]="range.end" [color]="range.color" [opacity]="range.opacity"></e-bullet-range>
+                }
+              </e-bullet-range-collection>
+            </ejs-bulletchart>
+          }
+        </div>
+      </section>
+
+      <section class="card chart-card">
+        <h3 class="card-title">Cancellation Reasons</h3>
+        <div [style.height]="chartFillHeight({ rows: 2, reserve: 300 })">
+          <ejs-accumulationchart
+            [theme]="chartTheme()"
+            height="100%"
+            [tooltip]="accumulationTooltip"
+            [legendSettings]="accumulationLegendBottom"
+            [centerLabel]="cancellationCenterLabel()"
+            [margin]="cancellationMargin">
+            <e-accumulation-series-collection>
+              <e-accumulation-series
+                type="Pie"
+                [dataSource]="cancellationData()"
+                xName="reason"
+                yName="count"
+                name="Cancellations"
+                innerRadius="60%"
+                [startAngle]="0"
+                [endAngle]="360"
+                [explode]="true"
+                explodeOffset="8px"
+                [pointColorMapping]="'color'"
+                [dataLabel]="cancellationDataLabel">
+              </e-accumulation-series>
+            </e-accumulation-series-collection>
+          </ejs-accumulationchart>
+        </div>
+      </section>
+    }
+  </div>
+</div>

@@ -1,0 +1,282 @@
+@inject PatientService PatientService
+@inject ThemeService ThemeService
+@implements IDisposable
+
+@if (_loading)
+{
+    <LoadingState Inline="true" Label="Loading clinical history…" />
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <ErrorBanner Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_data is null)
+{
+    <EmptyState Title="No clinical history" Description="No encounters recorded for this patient." />
+}
+else
+{
+    <div class="clinical-tab">
+        <section>
+            <div class="clinical-section-title">Vital Signs Trend</div>
+            <div class="clinical-section-subtitle">Last 6 readings</div>
+            @if (VitalSeries.Count == 0)
+            {
+                <EmptyState Title="No vitals recorded" />
+            }
+            else
+            {
+                <div style="height: @ChartPalette.ChartFillHeight(2, 360, 260, 420);">
+                    <SfChart @key="@("clinical-vitals"+ChartTheme)" Height="100%" Background="transparent" Theme="@ChartTheme">
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.DateTime" LabelFormat="MMM d" />
+                    <ChartPrimaryYAxis LabelFormat="{value}" />
+                    <ChartLegendSettings Visible="true" Position="LegendPosition.Bottom" />
+                    <ChartTooltipSettings Enable="true" />
+                    <ChartSeriesCollection>
+                        @foreach (var series in VitalSeries)
+                        {
+                            <ChartSeries DataSource="@series.Points" XName="Date" YName="Value" Name="@series.Name"
+                                         Type="ChartSeriesType.Line" Width="2">
+                                <ChartMarker Visible="true" Width="6" Height="6" />
+                            </ChartSeries>
+                        }
+                    </ChartSeriesCollection>
+                    </SfChart>
+                </div>
+            }
+        </section>
+
+        <section>
+            <div class="clinical-section-title">Lab Result Trends</div>
+            <div class="clinical-section-subtitle">Metabolic &amp; lipid panels over time</div>
+            @if (LabSeries.Count == 0)
+            {
+                <EmptyState Title="No lab data" />
+            }
+            else
+            {
+                <div style="height: @ChartPalette.ChartFillHeight(2, 360, 260, 420);">
+                    <SfChart @key="@("clinical-labs"+ChartTheme)" Height="100%" Background="transparent" Theme="@ChartTheme">
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.DateTime" LabelFormat="MMM d, yy" />
+                    <ChartLegendSettings Visible="true" Position="LegendPosition.Bottom" />
+                    <ChartTooltipSettings Enable="true" />
+                    <ChartSeriesCollection>
+                        @foreach (var series in LabSeries)
+                        {
+                            <ChartSeries DataSource="@series.Points" XName="Date" YName="Value" Name="@series.Name"
+                                         Type="ChartSeriesType.Line" Width="2">
+                                <ChartMarker Visible="true" Width="7" Height="7" Fill="@series.MarkerColor" />
+                            </ChartSeries>
+                        }
+                    </ChartSeriesCollection>
+                    </SfChart>
+                </div>
+            }
+        </section>
+
+        <section>
+            <div class="clinical-encounters-header">
+                <div>
+                    <div class="clinical-section-title">Encounters</div>
+                    <div class="clinical-section-subtitle">@FilteredEncounters.Count of @_data.Encounters.Count records</div>
+                </div>
+                <div class="chip-row">
+                    @foreach (var type in EncounterTypes)
+                    {
+                        var t = type;
+                        <button class="chip @(_typeFilter == t ? "chip-active" : "")" @onclick="() => _typeFilter = t">@t</button>
+                    }
+                </div>
+            </div>
+            @if (FilteredEncounters.Count == 0)
+            {
+                <EmptyState Title="No encounters match this filter" />
+            }
+            else
+            {
+                <div @key="_typeFilter">
+                    <SfAccordion ExpandMode="ExpandMode.Single">
+                        <AccordionItems>
+                            @foreach (var encounter in FilteredEncounters)
+                            {
+                                var e = encounter;
+                                <AccordionItem Header="@AccordionHeader(e)">
+                                    <ContentTemplate>
+                                        <div class="encounter-detail-grid">
+                                            <div class="clinical-detail-field">
+                                                <div class="clinical-detail-label">Department</div>
+                                                <div class="clinical-detail-value">@Display(e.DepartmentName)</div>
+                                            </div>
+                                            <div class="clinical-detail-field">
+                                                <div class="clinical-detail-label">Status</div>
+                                                <div class="clinical-detail-value"><StatusBadge Status="@e.Status" /></div>
+                                            </div>
+                                            <div class="clinical-detail-field">
+                                                <div class="clinical-detail-label">Reason</div>
+                                                <div class="clinical-detail-value">@Display(e.Reason)</div>
+                                            </div>
+                                            <div class="clinical-detail-field">
+                                                <div class="clinical-detail-label">Provider</div>
+                                                <div class="clinical-detail-value">@Display(e.ProviderName)</div>
+                                            </div>
+                                            <div class="clinical-detail-field">
+                                                <div class="clinical-detail-label">Assessment</div>
+                                                <div class="clinical-detail-value">@Display(e.Assessment)</div>
+                                            </div>
+                                            <div class="clinical-detail-field">
+                                                <div class="clinical-detail-label">Plan</div>
+                                                <div class="clinical-detail-value">@Display(e.Plan)</div>
+                                            </div>
+                                        </div>
+                                    </ContentTemplate>
+                                </AccordionItem>
+                            }
+                        </AccordionItems>
+                    </SfAccordion>
+                </div>
+            }
+        </section>
+
+        <section>
+            <div class="clinical-section-title">Referrals</div>
+            <div class="clinical-section-subtitle">@_data.Referrals.Count on record</div>
+            @if (_data.Referrals.Count == 0)
+            {
+                <EmptyState Title="No referrals" />
+            }
+            else
+            {
+                <div class="referral-card-grid">
+                    @foreach (var r in _data.Referrals)
+                    {
+                        <div class="referral-card">
+                            <div class="referral-card-header">
+                                <span class="referral-card-specialty">@r.Specialty</span>
+                                <StatusBadge Status="@r.Status" />
+                            </div>
+                            <div class="referral-card-meta">@FormatDate(r.RequestedDate) • From @r.FromProvider</div>
+                            <div class="referral-card-reason">@r.Reason</div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter] public string PatientId { get; set; } = string.Empty;
+
+    private static readonly string[] EncounterTypes = { "All", "Visit", "Telehealth", "Procedure", "Lab Visit" };
+
+    private ClinicalHistoryDto? _data;
+    private bool _loading = true;
+    private string? _error;
+    private string _typeFilter = "All";
+
+    private List<EncounterDto> FilteredEncounters =>
+        _data is null ? new() :
+        _typeFilter == "All" ? _data.Encounters :
+        _data.Encounters.Where(e => e.EncounterType == _typeFilter).ToList();
+
+    private List<VitalSeriesModel> VitalSeries
+    {
+        get
+        {
+            if (_data is null) return new();
+            return _data.Vitals
+                .GroupBy(v => v.Metric)
+                .Select(g => new VitalSeriesModel
+                {
+                    Name = g.Key,
+                    Points = g.Select(v => new ChartPoint
+                    {
+                        Date = DateTime.TryParse(v.ReadingDate, out var dt) ? dt : DateTime.MinValue,
+                        Value = v.Value
+                    })
+                    .OrderBy(p => p.Date)
+                    .ToList()
+                })
+                .ToList();
+        }
+    }
+
+    private List<VitalSeriesModel> LabSeries
+    {
+        get
+        {
+            if (_data is null) return new();
+            var relevant = _data.Labs
+                .Where(l => l.Category == "Lipid" || l.TestName == "Hemoglobin A1c" || l.TestName == "Fasting Glucose");
+            return relevant
+                .Select(l => new VitalSeriesModel
+                {
+                    Name = $"{l.TestName} ({l.Unit})",
+                    MarkerColor = l.IsAbnormal ? "#DC2626" : "#2563EB",
+                    Points = new List<ChartPoint>
+                    {
+                        new()
+                        {
+                            Date = DateTime.TryParse(l.CollectedDate, out var dt) ? dt : DateTime.MinValue,
+                            Value = l.Value
+                        }
+                    }
+                })
+                .ToList();
+        }
+    }
+
+    private Syncfusion.Blazor.Theme ChartTheme =>
+        ThemeService.Resolved == ResolvedTheme.Dark ? Syncfusion.Blazor.Theme.Tailwind3Dark : Syncfusion.Blazor.Theme.Tailwind3;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ThemeService.OnChange += OnThemeChanged;
+        await LoadAsync();
+    }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => ThemeService.OnChange -= OnThemeChanged;
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var result = await PatientService.GetPatientClinicalHistoryAsync(PatientId);
+            if (result.IsOk)
+                _data = result.Data;
+            else
+                _error = result.Error?.Title ?? "Failed to load clinical history.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        _loading = false;
+    }
+
+    private static string AccordionHeader(EncounterDto e)
+    {
+        return $"{DateFormats.FormatDate(e.EncounterDate)} • {e.EncounterType} • {e.ProviderName}";
+    }
+
+    private static string FormatDate(string iso) =>
+        DateFormats.FormatDate(iso);
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private class VitalSeriesModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string MarkerColor { get; set; } = string.Empty;
+        public List<ChartPoint> Points { get; set; } = new();
+    }
+
+    private class ChartPoint
+    {
+        public DateTime Date { get; set; }
+        public double Value { get; set; }
+    }
+}

@@ -1,0 +1,74 @@
+<div class="analytics-grid">
+  <div class="card">
+    <div class="card-title">Utilization Trend</div>
+    @if (utilizationLoading) {
+      <app-loading-state inline label="Loading utilization…"></app-loading-state>
+    } @else if (utilizationError) {
+      <app-error-banner title="Unable to load utilization" [message]="utilizationError" (retry)="retryUtilization()"></app-error-banner>
+    } @else if (utilizationData.length === 0) {
+      <app-empty-state title="No utilization data" description="No appointments in the last 6 months."></app-empty-state>
+    } @else {
+      <div [style.height]="chartFillHeight({ rows: 1, reserve: 420, floor: 240 })">
+      <ejs-chart
+        [theme]="chartTheme()"
+        [primaryXAxis]="categoryXAxis"
+        [primaryYAxis]="utilizationYAxis"
+        [legendSettings]="hiddenLegend"
+        [tooltip]="tooltip"
+        [selectionMode]="selectionMode"
+        [highlightMode]="highlightMode"
+        height="100%">
+        <e-series-collection>
+          <e-series
+            type="Spline"
+            [dataSource]="utilizationData"
+            xName="month"
+            yName="rate"
+            name="Utilization %"
+            [fill]="seriesTeal"
+            [width]="2"
+            [marker]="{ visible: true, width: 7, height: 7 }">
+          </e-series>
+        </e-series-collection>
+      </ejs-chart>
+      </div>
+    }
+  </div>
+
+  <div class="card">
+    <div class="card-title">No-Show Rate Trend</div>
+    <div class="card-subtitle">Department-level trend ({{ departmentName }})</div>
+    @if (noShowLoading) {
+      <app-loading-state inline label="Loading no-show trend…"></app-loading-state>
+    } @else if (noShowError) {
+      <app-error-banner title="Unable to load no-show trend" [message]="noShowError" (retry)="retryNoShow()"></app-error-banner>
+    } @else if (noShowData.length === 0) {
+      <app-empty-state title="No no-show data" description="No appointments in the last 6 months."></app-empty-state>
+    } @else {
+      <div [style.height]="chartFillHeight({ rows: 1, reserve: 420, floor: 240 })">
+      <ejs-chart
+        [theme]="chartTheme()"
+        [primaryXAxis]="categoryXAxis"
+        [primaryYAxis]="noShowYAxis"
+        [legendSettings]="hiddenLegend"
+        [tooltip]="tooltip"
+        [selectionMode]="selectionMode"
+        [highlightMode]="highlightMode"
+        height="100%">
+        <e-series-collection>
+          <e-series
+            type="Column"
+            [dataSource]="noShowData"
+            xName="month"
+            yName="rate"
+            name="No-Show %"
+            [fill]="seriesRose"
+            [columnWidth]="columnWidth"
+            [cornerRadius]="cornerRadius">
+          </e-series>
+        </e-series-collection>
+      </ejs-chart>
+      </div>
+    }
+  </div>
+</div>

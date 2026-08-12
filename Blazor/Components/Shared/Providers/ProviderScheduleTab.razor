@@ -1,0 +1,121 @@
+
+@using Syncfusion.Blazor.Schedule
+@using HealthcareAppointmentOps.Blazor.Components.Shared
+@using Microsoft.Extensions.Logging
+@inject ILogger<ProviderScheduleTab> Logger
+
+@if (Loading)
+{
+    <LoadingState Label="Loading appointments…" />
+}
+else if (!string.IsNullOrEmpty(Error))
+{
+    <ErrorBanner Message="@Error" OnRetry="OnRetry" />
+}
+else
+{
+    <div class="provider-schedule-card">
+        <SfSchedule @ref="_schedule"
+                    TValue="ScheduleEventData"
+                    Height="100%"
+                    SelectedDate="@_selectedDate"
+                    CurrentView="@_currentView"
+                    Timezone="UTC"
+                    StartHour="08:00"
+                    EndHour="18:00"
+                    Readonly="true">
+            <ScheduleWorkHours Highlight="true" Start="08:00" End="17:00" />
+            <ScheduleEventSettings DataSource="@Events" TValue="ScheduleEventData">
+                <ScheduleField Id="Id">
+                    <FieldSubject Name="Subject"></FieldSubject>
+                    <FieldStartTime Name="StartTime"></FieldStartTime>
+                    <FieldEndTime Name="EndTime"></FieldEndTime>
+                </ScheduleField>
+            </ScheduleEventSettings>
+            <ScheduleEvents TValue="ScheduleEventData" EventRendered="OnEventRendered" Navigating="OnNavigating" />
+            <ScheduleViews>
+                <ScheduleView Option="Syncfusion.Blazor.Schedule.View.Day" />
+                <ScheduleView Option="Syncfusion.Blazor.Schedule.View.Week" />
+                <ScheduleView Option="Syncfusion.Blazor.Schedule.View.Month" />
+            </ScheduleViews>
+        </SfSchedule>
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<ScheduleEventData> Events { get; set; } = Array.Empty<ScheduleEventData>();
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public DateTime SelectedDate { get; set; } = DateTime.Today;
+    [Parameter] public EventCallback<DateTime> OnNavigate { get; set; }
+
+    private SfSchedule<ScheduleEventData>? _schedule;
+    private IReadOnlyList<ScheduleEventData>? _refreshedEvents;
+    private DateTime _selectedDate = DateTime.Today;
+    private View _currentView = View.Week;
+
+    protected override void OnInitialized()
+    {
+        _selectedDate = SelectedDate;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_schedule is not null && !ReferenceEquals(_refreshedEvents, Events))
+        {
+            _refreshedEvents = Events;
+            try
+            {
+                await _schedule.RefreshEventsAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to refresh provider schedule events.");
+            }
+        }
+    }
+
+    private async Task OnNavigating(NavigatingEventArgs args)
+    {
+        if (args.ActionType == ActionType.DateNavigate && args.CurrentDate is DateTime newDate)
+        {
+            _selectedDate = newDate;
+            if (OnNavigate.HasDelegate)
+                await OnNavigate.InvokeAsync(newDate);
+        }
+        else if (args.ActionType == ActionType.ViewNavigate)
+        {
+            _currentView = args.CurrentView;
+        }
+    }
+
+    private void OnEventRendered(EventRenderedArgs<ScheduleEventData> args)
+    {
+        var data = args.Data;
+        if (data is null) return;
+
+        var classes = new List<string> { "health-ops-event", "evt-readonly" };
+        classes.Add($"evt-type-{Slugify(data.AppointmentType)}");
+        classes.Add($"evt-status-{data.Status.ToString().ToLowerInvariant()}");
+        args.CssClasses = classes;
+
+        var bg = data.CategoryColor;
+        var text = AppointmentColors.ChooseTextColor(bg);
+        args.Attributes = new Dictionary<string, object>
+        {
+            ["style"] = $"background:{bg};border-color:{bg};color:{text};",
+            ["data-appointment-type"] = data.AppointmentType ?? string.Empty,
+            ["data-status"] = data.Status.ToString(),
+        };
+    }
+
+    private static string Slugify(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "other";
+        var sb = new System.Text.StringBuilder();
+        foreach (var c in value.Trim().ToLowerInvariant())
+            sb.Append(char.IsLetterOrDigit(c) ? c : '-');
+        return sb.ToString().Trim('-');
+    }
+}

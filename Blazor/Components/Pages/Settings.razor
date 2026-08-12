@@ -1,0 +1,204 @@
+@page "/settings"
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Buttons
+@inject ReferenceDataService ReferenceDataService
+@inject ThemeService ThemeService
+@implements IDisposable
+
+<PageTitle>Settings | Healthcare Appointment and Patient Operations Portal</PageTitle>
+
+<div class="settings-page">
+    <SfTab CssClass="settings-tabs" LoadOn="ContentLoad.Demand">
+        <TabItems>
+            <TabItem>
+                <ChildContent>
+                    <TabHeader Text="Departments" />
+                </ChildContent>
+                <ContentTemplate>
+                    <div class="settings-card">
+                        @if (!string.IsNullOrEmpty(_departmentsError))
+                        {
+                            <ErrorBanner Message="@_departmentsError" OnRetry="LoadDepartmentsAsync" />
+                        }
+                        else if (_loadingDepartments)
+                        {
+                            <LoadingState Inline="true" Label="Loading departments…" />
+                        }
+                        else
+                        {
+                            <SfGrid @ref="_departmentsGrid"
+                                    DataSource="@_departments"
+                                    TValue="DepartmentDto"
+                                    Width="100%"
+                                    AllowPaging="true"
+                                    AllowSorting="true"
+                                    EnableAdaptiveUI="true"
+                                    AdaptiveUIMode="AdaptiveMode.Mobile">
+                                <GridPageSettings PageSize="20" />
+                                <GridColumns>
+                                    <GridColumn Field="@nameof(DepartmentDto.DepartmentCode)" HeaderText="Code" Width="100" IsPrimaryKey="true"></GridColumn>
+                                    <GridColumn Field="@nameof(DepartmentDto.DepartmentName)" HeaderText="Name" Width="200"></GridColumn>
+                                    <GridColumn Field="@nameof(DepartmentDto.LocationName)" HeaderText="Location" Width="200"></GridColumn>
+                                    <GridColumn Field="@nameof(DepartmentDto.IsActive)" HeaderText="Active" Width="90" DisplayAsCheckBox="true"></GridColumn>
+                                </GridColumns>
+                            </SfGrid>
+                        }
+                    </div>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent>
+                    <TabHeader Text="Locations" />
+                </ChildContent>
+                <ContentTemplate>
+                    <div class="settings-card">
+                        @if (!string.IsNullOrEmpty(_locationsError))
+                        {
+                            <ErrorBanner Message="@_locationsError" OnRetry="LoadLocationsAsync" />
+                        }
+                        else if (_loadingLocations)
+                        {
+                            <LoadingState Inline="true" Label="Loading locations…" />
+                        }
+                        else
+                        {
+                            <SfGrid @ref="_locationsGrid"
+                                    DataSource="@_locations"
+                                    TValue="LocationDto"
+                                    Width="100%"
+                                    AllowPaging="true"
+                                    AllowSorting="true"
+                                    EnableAdaptiveUI="true"
+                                    AdaptiveUIMode="AdaptiveMode.Mobile">
+                                <GridPageSettings PageSize="20" />
+                                <GridColumns>
+                                    <GridColumn Field="@nameof(LocationDto.LocationName)" HeaderText="Name" Width="200"></GridColumn>
+                                    <GridColumn Field="@nameof(LocationDto.Address)" HeaderText="Address" Width="240"></GridColumn>
+                                    <GridColumn Field="@nameof(LocationDto.City)" HeaderText="City" Width="120"></GridColumn>
+                                    <GridColumn Field="@nameof(LocationDto.State)" HeaderText="State" Width="80"></GridColumn>
+                                    <GridColumn Field="@nameof(LocationDto.PostalCode)" HeaderText="ZIP" Width="100"></GridColumn>
+                                    <GridColumn Field="@nameof(LocationDto.PhoneNumber)" HeaderText="Phone" Width="140"></GridColumn>
+                                    <GridColumn Field="@nameof(LocationDto.TimeZone)" HeaderText="Time Zone" Width="160"></GridColumn>
+                                    <GridColumn Field="@nameof(LocationDto.IsActive)" HeaderText="Active" Width="90" DisplayAsCheckBox="true"></GridColumn>
+                                </GridColumns>
+                            </SfGrid>
+                        }
+                    </div>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent>
+                    <TabHeader Text="Appearance" />
+                </ChildContent>
+                <ContentTemplate>
+                    <div class="settings-card">
+                        <div class="settings-appearance">
+                            <div class="settings-appearance-title">Appearance</div>
+                            <div class="settings-appearance-row">
+                                <div>
+                                    <div class="settings-appearance-label">Theme</div>
+                                    <div class="settings-appearance-help">Choose light, dark, or follow your system setting</div>
+                                </div>
+                                <div class="settings-theme-segmented"
+                                     role="radiogroup"
+                                     aria-label="Theme">
+                                    @foreach (var option in ThemeOptions)
+                                    {
+                                        var active = ThemeService.Mode == option.Mode;
+                                        <button type="button"
+                                                role="radio"
+                                                aria-checked="@active"
+                                                class="settings-theme-option"
+                                                style="background: @(active ? "var(--color-sf-bg-primary)" : "transparent");
+                                                       color: @(active ? "var(--color-sf-fg-brand-primary)" : "var(--color-sf-fg-tertiary)");
+                                                       font-weight: @(active ? 600 : 500);
+                                                       box-shadow: @(active ? "var(--shadow-sm)" : "none");"
+                                                @onclick="() => SelectTheme(option.Mode)">
+                                            @option.Label
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </ContentTemplate>
+            </TabItem>
+        </TabItems>
+    </SfTab>
+</div>
+
+@code {
+    private SfGrid<DepartmentDto>? _departmentsGrid;
+    private SfGrid<LocationDto>? _locationsGrid;
+
+    private List<DepartmentDto> _departments = new();
+    private List<LocationDto> _locations = new();
+
+    private bool _loadingDepartments;
+    private bool _loadingLocations;
+    private string? _departmentsError;
+    private string? _locationsError;
+
+    private record ThemeOption(ThemeMode Mode, string Label);
+
+    private List<ThemeOption> ThemeOptions => new()
+    {
+        new(ThemeMode.Light, "Light"),
+        new(ThemeMode.Dark, "Dark"),
+        new(ThemeMode.System, "System"),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        ThemeService.OnChange += OnThemeChanged;
+        await Task.WhenAll(LoadDepartmentsAsync(), LoadLocationsAsync());
+    }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => ThemeService.OnChange -= OnThemeChanged;
+
+    private async Task LoadDepartmentsAsync()
+    {
+        _loadingDepartments = true;
+        _departmentsError = null;
+        try
+        {
+            var result = await ReferenceDataService.GetDepartmentsAsync();
+            if (result.IsOk)
+                _departments = result.Data ?? new();
+            else
+                _departmentsError = result.Error?.Title ?? "Failed to load departments.";
+        }
+        catch (Exception ex)
+        {
+            _departmentsError = ex.Message;
+        }
+        _loadingDepartments = false;
+    }
+
+    private async Task LoadLocationsAsync()
+    {
+        _loadingLocations = true;
+        _locationsError = null;
+        try
+        {
+            var result = await ReferenceDataService.GetLocationsAsync();
+            if (result.IsOk)
+                _locations = result.Data ?? new();
+            else
+                _locationsError = result.Error?.Title ?? "Failed to load locations.";
+        }
+        catch (Exception ex)
+        {
+            _locationsError = ex.Message;
+        }
+        _loadingLocations = false;
+    }
+
+    private async Task SelectTheme(ThemeMode mode)
+    {
+        await ThemeService.SetModeAsync(mode);
+    }
+}

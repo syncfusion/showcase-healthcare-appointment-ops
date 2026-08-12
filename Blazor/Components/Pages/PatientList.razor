@@ -1,0 +1,148 @@
+@page "/patients"
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Grids
+@inject PatientService PatientService
+@inject NavigationManager Nav
+
+<PageTitle>Patients | Healthcare Appointment and Patient Operations Portal</PageTitle>
+
+<div class="patient-list-page">
+    @if (_loading)
+    {
+        <LoadingState Label="Loading patients…" />
+    }
+    else if (!string.IsNullOrEmpty(_error))
+    {
+        <ErrorBanner Title="Failed to load patients" Message="@_error" OnRetry="LoadAsync" />
+    }
+    else if (_patients.Count == 0)
+    {
+        <EmptyState Title="No patients found"
+                    Description="No patient records to display." />
+    }
+    else
+    {
+        <SfGrid DataSource="_patients"
+                TValue="PatientSummaryDto"
+                CssClass="patient-grid"
+                Width="100%"
+                AllowPaging="true"
+                AllowSorting="true"
+                AllowFiltering="true"
+                ShowColumnChooser="true"
+                Toolbar="@(new List<string> { "Search", "ColumnChooser" })">
+            <GridPageSettings PageSize="50" PageSizes="@(new string[] { "5", "10", "25", "50", "100" })" />
+            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+            <GridSearchSettings Fields="@(new string[] { "firstName", "lastName", "medicalRecordNumber", "phoneNumber", "primaryCareProviderName" })" Operator="Syncfusion.Blazor.Operator.Contains" IgnoreCase="true" />
+            <GridEvents TValue="PatientSummaryDto"
+                        OnRecordClick="OnRecordClick" />
+            <GridColumns>
+                <GridColumn Field="@nameof(PatientSummaryDto.LastName)" HeaderText="Patient" Width="260">
+                    <Template>
+                        @{
+                            var p = (PatientSummaryDto)context;
+                        }
+                        <div class="patient-cell">
+                            <InitialsAvatar FirstName="@p.FirstName" LastName="@p.LastName" Size="34" />
+                            <div class="patient-cell-body">
+                                <div class="patient-cell-name">@p.FirstName @p.LastName</div>
+                                <div class="patient-cell-meta">@p.MedicalRecordNumber · Age @CalcAge(p.DateOfBirth)</div>
+                            </div>
+                        </div>
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(PatientSummaryDto.Gender)" HeaderText="Gender" Width="100" />
+                <GridColumn Field="@nameof(PatientSummaryDto.PhoneNumber)" HeaderText="Phone" Width="140" />
+                <GridColumn Field="@nameof(PatientSummaryDto.PrimaryCareProviderName)" HeaderText="Primary Care Provider" Width="180" HideAtMedia="(max-width: 1023px)" />
+                <GridColumn Field="@nameof(PatientSummaryDto.NextAppointmentDateTime)" HeaderText="Upcoming Appointment" Width="220">
+                    <Template>
+                        @{
+                            var p = (PatientSummaryDto)context;
+                        }
+                        @if (string.IsNullOrEmpty(p.NextAppointmentDateTime))
+                        {
+                            <span style="color: var(--color-sf-fg-tertiary);">—</span>
+                        }
+                        else
+                        {
+                            <div class="patient-cell-appt">
+                                <span>@FormatApptDate(p.NextAppointmentDateTime)</span>
+                                <span class="patient-cell-appt-type">@p.NextAppointmentType</span>
+                                @if (!string.IsNullOrEmpty(p.NextAppointmentStatus))
+                                {
+                                    <StatusBadge Status="@p.NextAppointmentStatus" />
+                                }
+                            </div>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(PatientSummaryDto.IsActive)" HeaderText="Status" Width="100" HideAtMedia="(max-width: 640px)">
+                    <Template>
+                        @{
+                            var p = (PatientSummaryDto)context;
+                        }
+                        <StatusBadge Status="@(p.IsActive ? "Active" : "Inactive")" />
+                    </Template>
+                </GridColumn>
+                <GridColumn HeaderText="Actions" Width="110" AllowFiltering="false" AllowSorting="false">
+                    <Template>
+                        @{
+                            var p = (PatientSummaryDto)context;
+                        }
+                        <SfButton CssClass="e-flat e-primary e-small" Style="padding: 2px 12px;" OnClick="@(args => Nav.NavigateTo($"/patients/{p.PatientId}"))">View</SfButton>
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </SfGrid>
+    }
+</div>
+
+@code {
+    private List<PatientSummaryDto> _patients = new();
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var result = await PatientService.GetPatientsAsync(new PagingRequest { Offset = 0, Limit = 200 });
+            if (result.IsOk)
+                _patients = result.Data?.Items ?? new();
+            else
+                _error = result.Error?.Title ?? "Failed to load patients.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        _loading = false;
+    }
+
+    private void OnRecordClick(RecordClickEventArgs<PatientSummaryDto> args)
+    {
+        if (args.RowData is not null)
+            Nav.NavigateTo($"/patients/{args.RowData.PatientId}");
+    }
+
+    private static int CalcAge(string dateOfBirth)
+    {
+        if (!DateTime.TryParse(dateOfBirth, out var dob)) return 0;
+        var today = DateTime.Today;
+        var age = today.Year - dob.Year;
+        if (dob.Date > today.AddYears(-age)) age--;
+        return age;
+    }
+
+    private static string FormatApptDate(string value)
+    {
+        return DateFormats.FormatDateTime(value);
+    }
+}

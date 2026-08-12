@@ -1,0 +1,218 @@
+@using Syncfusion.Blazor.Grids
+@inject AppointmentService AppointmentService
+
+<div class="patient-appts-tab">
+    <div class="patient-appts-kpis">
+        <KpiCard Title="Total" Value="@Appointments.Count.ToString()" />
+        <KpiCard Title="Completed" Value="@CompletedCount.ToString()" />
+        <KpiCard Title="No-Shows" Value="@NoShowCount.ToString()" />
+        <KpiCard Title="Upcoming" Value="@UpcomingCount.ToString()" />
+    </div>
+
+    <div class="patient-appts-filter">
+        <span class="patient-appts-filter-label">Status:</span>
+        <SfDropDownList TValue="string" TItem="string"
+                        Width="200px"
+                        DataSource="@StatusOptions"
+                        SortOrder="Syncfusion.Blazor.DropDowns.SortOrder.Ascending"
+                        Value="@_statusFilter">
+            <DropDownListEvents TValue="string" TItem="string" ValueChange="OnStatusFilterChanged" />
+        </SfDropDownList>
+    </div>
+
+    <SfGrid DataSource="_filteredRows"
+            TValue="ApptRow"
+            Width="100%"
+            AllowPaging="true"
+            AllowSorting="true"
+            Toolbar="@(new List<string> { "Search" })">
+        <GridPageSettings PageSize="10" />
+        <GridColumns>
+            <GridColumn HeaderText="Actions" Width="210" AllowFiltering="false" AllowSorting="false">
+                <Template>
+                    @{
+                        var row = (ApptRow)context;
+                    }
+                    @if (!row.Actionable)
+                    {
+                        <span style="color: var(--color-sf-fg-tertiary); font-size: 12px;">—</span>
+                    }
+                    else
+                    {
+                        <div class="patient-appts-actions">
+                            @if (row.Status is "Scheduled" or "Confirmed")
+                            {
+                                <SfButton CssClass="e-primary e-small" OnClick="@(args => OpenConfirm(row, "checkin"))">Check In</SfButton>
+                                <SfButton CssClass="e-info e-small e-outline" OnClick="@(args => OpenConfirm(row, "noshow"))">No-Show</SfButton>
+                            }
+                            <SfButton CssClass="e-danger e-small e-outline" OnClick="@(args => OpenCancel(row))">Cancel</SfButton>
+                        </div>
+                    }
+                </Template>
+            </GridColumn>
+            <GridColumn Field="@nameof(ApptRow.ScheduledDateTime)" HeaderText="Date/Time" Width="160" Format="MMM d, yyyy h:mm tt" Type="ColumnType.DateTime" />
+            <GridColumn Field="@nameof(ApptRow.AppointmentType)" HeaderText="Type" Width="140" />
+            <GridColumn Field="@nameof(ApptRow.ProviderName)" HeaderText="Provider" Width="160" />
+            <GridColumn Field="@nameof(ApptRow.DepartmentName)" HeaderText="Department" Width="140" />
+            <GridColumn Field="@nameof(ApptRow.LocationName)" HeaderText="Location" Width="140" />
+            <GridColumn Field="@nameof(ApptRow.RoomNumber)" HeaderText="Room" Width="90" />
+            <GridColumn Field="@nameof(ApptRow.Status)" HeaderText="Status" Width="120">
+                <Template>
+                    @{
+                        var row = (ApptRow)context;
+                    }
+                    <StatusBadge Status="@row.Status" />
+                </Template>
+            </GridColumn>
+            <GridColumn Field="@nameof(ApptRow.DurationMinutes)" HeaderText="Duration" Width="100" />
+            <GridColumn Field="@nameof(ApptRow.ReasonForVisit)" HeaderText="Reason" Width="200" />
+        </GridColumns>
+    </SfGrid>
+</div>
+
+@if (_cancelTarget is not null)
+{
+    <SfDialog Width="400px" IsModal="true" ShowCloseIcon="true" Header="Cancel Appointment" Visible="true"
+              Close="@(EventCallback.Factory.Create<Syncfusion.Blazor.Popups.CloseEventArgs>(this, args => _cancelTarget = null))">
+        <DialogButtons>
+            <DialogButton Content="Confirm Cancel" CssClass="e-danger"
+                          OnClick="@(EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.MouseEventArgs>(this, args => RunCancelAsync()))" />
+            <DialogButton Content="Dismiss" CssClass="e-flat"
+                          OnClick="@(EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.MouseEventArgs>(this, args => _cancelTarget = null))" />
+        </DialogButtons>
+        <div style="padding: 8px;">
+            <p style="margin: 0 0 8px; font-size: 13px; color: var(--color-sf-fg-tertiary);">
+                Cancel appointment on @DateFormats.FormatDateTime(_cancelTarget.ScheduledDateTime)?
+            </p>
+            <SfTextBox Multiline="true" Placeholder="Reason (optional)"
+                       Value="@_cancelReason"
+                       ValueChanged="@(EventCallback.Factory.Create<string>(this, v => _cancelReason = v ?? string.Empty))" />
+        </div>
+    </SfDialog>
+}
+
+@if (_confirmTarget is not null)
+{
+    <SfDialog Width="360px" IsModal="true" ShowCloseIcon="true"
+              Header="@(_confirmKind == "checkin" ? "Check In" : "Mark No-Show")" Visible="true"
+              Close="@(EventCallback.Factory.Create<Syncfusion.Blazor.Popups.CloseEventArgs>(this, args => _confirmTarget = null))">
+        <DialogButtons>
+            <DialogButton Content="@(_confirmKind == "checkin" ? "Check In" : "Mark No-Show")" IsPrimary="true"
+                          OnClick="@(EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.MouseEventArgs>(this, args => RunConfirmAsync()))" />
+            <DialogButton Content="Dismiss" CssClass="e-flat"
+                          OnClick="@(EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.MouseEventArgs>(this, args => _confirmTarget = null))" />
+        </DialogButtons>
+        <div style="padding: 8px; font-size: 14px;">
+            @(_confirmKind == "checkin"
+                ? "Check in this patient for the selected appointment?"
+                : "Mark this appointment as a no-show?")
+        </div>
+    </SfDialog>
+}
+
+@code {
+    [Parameter] public List<AppointmentSummaryDto> Appointments { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static readonly List<string> StatusOptions = new()
+    {
+        "All", "Scheduled", "Confirmed", "CheckedIn", "InProgress", "Completed", "Cancelled", "NoShow"
+    };
+
+    private string _statusFilter = "All";
+    private List<ApptRow> _filteredRows = new();
+    private ApptRow? _cancelTarget;
+    private string _cancelReason = string.Empty;
+    private ApptRow? _confirmTarget;
+    private string _confirmKind = "checkin";
+
+    private int CompletedCount => Appointments.Count(a => a.Status == AppointmentStatus.Completed);
+    private int NoShowCount => Appointments.Count(a => a.Status == AppointmentStatus.NoShow);
+    private int UpcomingCount => Appointments.Count(a =>
+        (a.Status == AppointmentStatus.Scheduled || a.Status == AppointmentStatus.Confirmed) &&
+        DateTime.TryParse(a.ScheduledDateTime, out var dt) && dt >= DateTime.Now);
+
+    protected override void OnParametersSet() => ApplyFilter();
+
+    private void OnStatusFilterChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, string> args)
+    {
+        _statusFilter = args.Value ?? "All";
+        ApplyFilter();
+    }
+
+    private void ApplyFilter() => _filteredRows = Appointments
+        .Where(a => _statusFilter == "All" || a.Status.ToString() == _statusFilter)
+        .Select(ToRow)
+        .ToList();
+
+    private static ApptRow ToRow(AppointmentSummaryDto a) => new()
+    {
+        AppointmentId = a.AppointmentId,
+        ScheduledDateTime = DateTime.TryParse(a.ScheduledDateTime, out var dt) ? dt : DateTime.MinValue,
+        AppointmentType = a.AppointmentType,
+        ProviderName = a.ProviderName,
+        DepartmentName = a.DepartmentName,
+        LocationName = a.LocationName,
+        RoomNumber = a.RoomNumber ?? string.Empty,
+        Status = a.Status.ToString(),
+        DurationMinutes = a.DurationMinutes
+    };
+
+    private void OpenConfirm(ApptRow row, string kind)
+    {
+        _confirmTarget = row;
+        _confirmKind = kind;
+    }
+
+    private void OpenCancel(ApptRow row)
+    {
+        _cancelTarget = row;
+        _cancelReason = string.Empty;
+    }
+
+    private async Task RunConfirmAsync()
+    {
+        if (_confirmTarget is null) return;
+        try
+        {
+            if (_confirmKind == "checkin")
+                await AppointmentService.CheckInAsync(_confirmTarget.AppointmentId, "kiosk");
+            else
+                await AppointmentService.NoShowAsync(_confirmTarget.AppointmentId);
+            await OnChanged.InvokeAsync();
+        }
+        finally
+        {
+            _confirmTarget = null;
+        }
+    }
+
+    private async Task RunCancelAsync()
+    {
+        if (_cancelTarget is null) return;
+        try
+        {
+            await AppointmentService.CancelAsync(_cancelTarget.AppointmentId, string.IsNullOrWhiteSpace(_cancelReason) ? null : _cancelReason);
+            await OnChanged.InvokeAsync();
+        }
+        finally
+        {
+            _cancelTarget = null;
+        }
+    }
+
+    public class ApptRow
+    {
+        public string AppointmentId { get; set; } = string.Empty;
+        public DateTime ScheduledDateTime { get; set; }
+        public string AppointmentType { get; set; } = string.Empty;
+        public string ProviderName { get; set; } = string.Empty;
+        public string DepartmentName { get; set; } = string.Empty;
+        public string LocationName { get; set; } = string.Empty;
+        public string RoomNumber { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public int DurationMinutes { get; set; }
+        public string ReasonForVisit { get; set; } = string.Empty;
+        public bool Actionable => Status is "Scheduled" or "Confirmed" or "CheckedIn";
+    }
+}

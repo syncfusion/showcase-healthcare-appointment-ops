@@ -1,0 +1,76 @@
+<ejs-dialog
+  header="Match slot — {{ entry.patientName }}"
+  [visible]="true"
+  width="480px"
+  [isModal]="true"
+  [showCloseIcon]="true"
+  (close)="close.emit()"
+  target=".waitlist-root">
+  <div class="dialog-body">
+    <div class="dialog-summary">
+      {{ entry.requestedAppointmentType }} • {{ entry.preferredDepartmentName }} • preferred
+      {{ minDate | date: 'mediumDate' }} – {{ maxDate | date: 'mediumDate' }}
+    </div>
+
+    <div class="controls">
+      <div class="control-field control-field--grow">
+        <label class="control-label">Provider</label>
+        <ejs-dropdownlist
+          [dataSource]="providers()"
+          [fields]="providerFields"
+          [value]="providerId()"
+          [sortOrder]="'Ascending'"
+          placeholder="Select provider"
+          (change)="onProviderChange($event.value)">
+        </ejs-dropdownlist>
+      </div>
+      <div class="control-field control-field--date">
+        <label class="control-label">Date</label>
+        <ejs-datepicker
+          [value]="date()"
+          [min]="minDate"
+          [max]="maxDate"
+          (change)="onDateChange($event.value)">
+        </ejs-datepicker>
+      </div>
+      <div class="control-action">
+        <button ejs-button cssClass="e-primary" [disabled]="finding()" (click)="findSlots()">
+          {{ finding() ? 'Finding…' : 'Find slots' }}
+        </button>
+      </div>
+    </div>
+
+    @if (error(); as err) {
+      <div class="dialog-error">
+        <app-error-banner [message]="err"></app-error-banner>
+      </div>
+    }
+
+    <div class="slot-area">
+      @if (finding()) {
+        <app-empty-state title="Loading…" description="Loading available slots…"></app-empty-state>
+      } @else if (slots().length === 0) {
+        <div class="no-slots">No available slots for this provider and date. Try another date.</div>
+      } @else {
+        <div class="slot-grid">
+          @for (s of slots(); track s.slotStart) {
+            <button
+              type="button"
+              class="slot"
+              [class.slot--selected]="selectedSlot()?.slotStart === s.slotStart"
+              (click)="selectSlot(s)">
+              {{ formatTime(s.slotStart) }}
+            </button>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="dialog-footer">
+      <button ejs-button cssClass="e-outline" [disabled]="submitting()" (click)="close.emit()">Cancel</button>
+      <button ejs-button cssClass="e-success" [disabled]="!selectedSlot() || submitting()" (click)="confirmMatch()">
+        {{ submitting() ? 'Matching…' : (selectedSlot() ? 'Confirm ' + formatTime(selectedSlot()!.slotStart) : 'Confirm match') }}
+      </button>
+    </div>
+  </div>
+</ejs-dialog>

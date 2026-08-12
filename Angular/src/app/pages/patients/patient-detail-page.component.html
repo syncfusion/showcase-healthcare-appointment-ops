@@ -1,0 +1,183 @@
+@if (error(); as err) {
+  <app-error-banner title="Unable to load patient" [message]="err" (retry)="retryPatient()"></app-error-banner>
+}
+
+@if (loading() && !patient()) {
+  <app-loading-state label="Loading patient…"></app-loading-state>
+} @else if (!patient()) {
+  <app-empty-state
+    title="Patient not found"
+    description="The requested patient does not exist.">
+  </app-empty-state>
+} @else {
+  <div class="patient-detail">
+    <div class="patient-header">
+      <div class="patient-header-body">
+        <span class="patient-avatar">
+          {{ (patient()?.firstName?.[0] ?? '') + (patient()?.lastName?.[0] ?? '') }}
+        </span>
+        <div class="patient-meta">
+          <div class="patient-name">{{ patient()?.firstName }} {{ patient()?.lastName }}</div>
+          <div class="patient-subtitle">
+            MRN: {{ patient()?.medicalRecordNumber }} • DOB: {{ fmtDob(patient()?.dateOfBirth) }}
+            @if (age() !== null) { • Age: {{ age() }} }
+          </div>
+          <div class="patient-extra">
+            {{ patient()?.phoneNumber }} • {{ patient()?.email }} • PCP:
+            @if (patient()?.primaryCareProviderId) {
+              <a class="pcp-link" (click)="navigateToPcp(patient()?.primaryCareProviderId)">
+                {{ patient()?.primaryCareProviderName || 'View' }}
+              </a>
+            } @else {
+              {{ patient()?.primaryCareProviderName || '—' }}
+            }
+          </div>
+        </div>
+      </div>
+      <div class="patient-header-actions">
+        <app-status-badge [status]="patient()?.isActive ? 'Active' : 'Inactive'"></app-status-badge>
+        <div class="patient-actions">
+          <button ejs-button cssClass="e-outline" (click)="activeTab.set('appointments')">Book Appointment</button>
+        </div>
+      </div>
+    </div>
+
+    <ejs-tab heightAdjustMode="Auto" [selectedItem]="selectedTabIndex()" (selecting)="onTabSelecting($event)">
+      <e-tabitems>
+        @for (header of tabHeaders; track header.text) {
+          <e-tabitem [header]="header"></e-tabitem>
+        }
+      </e-tabitems>
+    </ejs-tab>
+
+    <div class="tab-content">
+      @switch (activeTab()) {
+        @case ('overview') {
+          <div class="overview-layout">
+            <div class="overview-kpis">
+              <app-kpi-card title="Total Appointments" [value]="metrics().total">
+                <ng-template #icon><svg lucideCalendarDays [size]="18" [strokeWidth]="2"></svg></ng-template>
+              </app-kpi-card>
+              <app-kpi-card title="Completed" [value]="metrics().completedCount">
+                <ng-template #icon><svg lucideCheckCircle [size]="18" [strokeWidth]="2"></svg></ng-template>
+              </app-kpi-card>
+              <app-kpi-card title="Upcoming" [value]="metrics().upcomingCount">
+                <ng-template #icon><svg lucideClock [size]="18" [strokeWidth]="2"></svg></ng-template>
+              </app-kpi-card>
+              <app-kpi-card title="No-Shows" [value]="metrics().noShowsCount">
+                <ng-template #icon><svg lucideUserX [size]="18" [strokeWidth]="2"></svg></ng-template>
+              </app-kpi-card>
+            </div>
+
+            <div class="overview-row">
+              <div class="panel overview-timeline-panel">
+                <div class="panel-title">Patient Timeline</div>
+                <app-patient-timeline
+                  [appts]="appts()"
+                  [auditEntries]="auditEntries()">
+                </app-patient-timeline>
+              </div>
+
+              <div class="overview-side">
+                <div class="panel">
+                  <div class="panel-title">Upcoming Appointment</div>
+                  @if (metrics().nextVisit; as next) {
+                    <div class="upcoming-body">
+                      <div class="upcoming-datetime-row">
+                        <div class="upcoming-datetime">{{ fmtAppt(next.scheduledDateTime) }}</div>
+                        <app-status-badge [status]="next.status"></app-status-badge>
+                      </div>
+
+                      <div class="upcoming-type-row">
+                        <span class="upcoming-icon">
+                          <svg lucideStethoscope [size]="16" [strokeWidth]="2"></svg>
+                        </span>
+                        <div>
+                          <div class="upcoming-type">{{ next.appointmentType }}</div>
+                          <div class="upcoming-provider">{{ next.providerName }}</div>
+                        </div>
+                      </div>
+
+                      <div class="upcoming-meta-grid">
+                        <div class="upcoming-meta-item">
+                          <svg lucideBuilding2 [size]="14" [strokeWidth]="2"></svg>
+                          <span>{{ next.departmentName }}</span>
+                        </div>
+                        <div class="upcoming-meta-item">
+                          <svg lucideMapPin [size]="14" [strokeWidth]="2"></svg>
+                          <span>{{ next.locationName }}{{ next.roomNumber ? ' · Room ' + next.roomNumber : '' }}</span>
+                        </div>
+                        <div class="upcoming-meta-item">
+                          <svg lucideHourglass [size]="14" [strokeWidth]="2"></svg>
+                          <span>{{ next.durationMinutes }} min</span>
+                        </div>
+                      </div>
+                    </div>
+                  } @else {
+                    <div class="upcoming-empty">
+                      <div class="upcoming-empty-emoji">📅</div>
+                      <div class="upcoming-empty-title">No upcoming appointments</div>
+                      <div class="upcoming-empty-hint">A future appointment will appear here once scheduled.</div>
+                    </div>
+                  }
+                </div>
+
+                <div class="panel">
+                  <div class="panel-title">Patient Information</div>
+                  <div class="info-grid">
+                    <div class="info-field">
+                      <div class="info-label">Gender</div>
+                      <div class="info-value">{{ patient()?.gender || '—' }}</div>
+                    </div>
+                    <div class="info-field">
+                      <div class="info-label">Preferred Language</div>
+                      <div class="info-value">{{ patient()?.preferredLanguage || '—' }}</div>
+                    </div>
+                    <div class="info-field">
+                      <div class="info-label">Insurance</div>
+                      <div class="info-value">{{ patient()?.insuranceType || '—' }}</div>
+                    </div>
+                    <div class="info-field">
+                      <div class="info-label">Registration Date</div>
+                      <div class="info-value">{{ fmtRegistrationDate(patient()?.registrationDate) }}</div>
+                    </div>
+                    <div class="info-field">
+                      <div class="info-label">Proxy Access</div>
+                      <div class="info-value">{{ patient()?.hasProxyAccess ? 'Yes' : 'No' }}</div>
+                    </div>
+                    <div class="info-field">
+                      <div class="info-label">Address</div>
+                      <div class="info-value">
+                        {{ patient()?.addressLine }}, {{ patient()?.city }}, {{ patient()?.state }} {{ patient()?.postalCode }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        @case ('clinical') {
+          <app-patient-clinical-history-tab [patientId]="id()"></app-patient-clinical-history-tab>
+        }
+
+        @case ('medications') {
+          <app-patient-medications-tab [patientId]="id()"></app-patient-medications-tab>
+        }
+
+        @case ('documents') {
+          <app-patient-documents-tab [patientId]="id()"></app-patient-documents-tab>
+        }
+
+        @case ('care-plan') {
+          <app-patient-care-plan-tab [patientId]="id()"></app-patient-care-plan-tab>
+        }
+
+        @case ('appointments') {
+          <app-patient-appointments-tab [patientId]="id()"></app-patient-appointments-tab>
+        }
+      }
+    </div>
+  </div>
+}

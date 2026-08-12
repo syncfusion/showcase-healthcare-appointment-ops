@@ -1,0 +1,69 @@
+@if (loading()) {
+  <app-loading-state inline label="Loading care plan…"></app-loading-state>
+} @else if (error(); as err) {
+  <app-error-banner [message]="err" (retry)="retry()"></app-error-banner>
+} @else if (!plan()) {
+  <app-empty-state
+    title="No care plan"
+    description="Generate a draft to create a care plan.">
+  </app-empty-state>
+} @else {
+  <div class="care-plan-layout">
+    <div class="care-plan-header">
+      <div>
+        <div class="care-plan-title">{{ plan()!.title }}</div>
+        <div class="care-plan-meta">
+          {{ plan()!.authorName }} • Version {{ plan()!.version }} • Last updated
+          {{ lastUpdatedLabel() }} • {{ plan()!.goals.length }} goals
+        </div>
+      </div>
+      <div class="care-plan-actions">
+        @if (draftMeta(); as meta) {
+          <span class="ai-confidence">
+            AI Confidence:
+            <strong [style.color]="confidenceColor()">{{ confidencePct() }}%</strong>
+          </span>
+        }
+        <button ejs-button cssClass="e-primary" [disabled]="drafting()" (click)="generateDraft()">
+          {{ drafting() ? 'Generating…' : '✨ Generate Draft' }}
+        </button>
+        <button ejs-button cssClass="e-success" [disabled]="publishing()" (click)="publish()">
+          {{ publishing() ? 'Publishing…' : 'Publish' }}
+        </button>
+      </div>
+    </div>
+
+    @if (draftError(); as err) {
+      <div class="draft-error">{{ err }}</div>
+    }
+
+    @if (draftMeta(); as meta) {
+      <div class="draft-meta">
+        {{ meta.explanation }} Generated sections: {{ meta.sections.join(', ') }}.
+      </div>
+    }
+
+    @if (published()) {
+      <div class="published-banner">
+        ✓ Care plan published. New version logged to audit trail.
+      </div>
+    }
+
+    <div class="care-plan-body">
+      <div class="editor-panel">
+        <div class="editor-panel-head">
+          <span class="editor-panel-title">Care Plan Document</span>
+          <span class="editor-panel-hint">Track changes · Mail merge · Comments · Revision history</span>
+        </div>
+        <ejs-documenteditorcontainer
+          #editor
+          id="care-plan-editor"
+          width="100%"
+          height="max(520px, calc(100vh - 360px))"
+          [enableToolbar]="true"
+          (created)="onEditorCreated()">
+        </ejs-documenteditorcontainer>
+      </div>
+    </div>
+  </div>
+}

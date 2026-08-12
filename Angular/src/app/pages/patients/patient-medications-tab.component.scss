@@ -1,0 +1,50 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.adherence-widget {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  background: var(--color-sf-bg-secondary);
+  padding: 16px;
+  border-radius: var(--radius-8);
+  border: 1px solid var(--color-sf-border-secondary);
+}
+
+.adherence-body {
+  flex: 1;
+}
+
+.adherence-label {
+  font-size: 13px;
+  color: var(--color-sf-fg-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.adherence-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.adherence-hint {
+  font-size: 12px;
+  color: var(--color-sf-fg-quinary);
+  margin-top: 4px;
+}
+
+.refill-toast {
+  position: sticky;
+  bottom: 16px;
+  background: var(--color-sf-bg-success-solid);
+  color: var(--color-sf-fg-white);
+  padding: 10px 16px;
+  border-radius: var(--radius-8);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-md);
+  align-self: flex-end;
+}

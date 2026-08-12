@@ -1,0 +1,23 @@
+@using Syncfusion.Blazor.Buttons
+
+<div class="empty-state">
+    <div class="empty-state-emoji" aria-hidden="true">📋</div>
+    <div class="empty-state-title">@Title</div>
+    @if (!string.IsNullOrEmpty(Description))
+    {
+        <div class="empty-state-description">@Description</div>
+    }
+    @if (!string.IsNullOrEmpty(ActionLabel) && OnAction.HasDelegate)
+    {
+        <div class="empty-state-actions">
+            <SfButton CssClass="e-primary" OnClick="OnAction">@ActionLabel</SfButton>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? ActionLabel { get; set; }
+    [Parameter] public EventCallback OnAction { get; set; }
+}

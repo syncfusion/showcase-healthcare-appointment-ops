@@ -1,0 +1,57 @@
+
+@if (string.IsNullOrEmpty(Value))
+{
+    <span style="color: var(--color-sf-fg-quinary);">—</span>
+}
+else
+{
+    <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;background:@ResolvedBg;color:@ResolvedFg;">
+        @Value
+    </span>
+}
+
+@code {
+    [Parameter] public string? Value { get; set; }
+
+    private static readonly Dictionary<string, (string Bg, string Fg)> ChipColors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["cardiology"] = ("var(--color-sf-chip-cardiology-bg)", "var(--color-sf-chip-cardiology-fg)"),
+        ["neurology"] = ("var(--color-sf-chip-neurology-bg)", "var(--color-sf-chip-neurology-fg)"),
+        ["orthopedics"] = ("var(--color-sf-chip-orthopedics-bg)", "var(--color-sf-chip-orthopedics-fg)"),
+        ["pediatrics"] = ("var(--color-sf-chip-pediatrics-bg)", "var(--color-sf-chip-pediatrics-fg)"),
+        ["dermatology"] = ("var(--color-sf-chip-dermatology-bg)", "var(--color-sf-chip-dermatology-fg)"),
+        ["ophthalmology"] = ("var(--color-sf-chip-ophthalmology-bg)", "var(--color-sf-chip-ophthalmology-fg)"),
+        ["internal medicine"] = ("var(--color-sf-chip-internal-medicine-bg)", "var(--color-sf-chip-internal-medicine-fg)"),
+        ["family medicine"] = ("var(--color-sf-chip-family-medicine-bg)", "var(--color-sf-chip-family-medicine-fg)"),
+        ["obstetrics & gynecology"] = ("var(--color-sf-chip-obstetrics-gynecology-bg)", "var(--color-sf-chip-obstetrics-gynecology-fg)"),
+        ["obstetrics"] = ("var(--color-sf-chip-obstetrics-bg)", "var(--color-sf-chip-obstetrics-fg)"),
+        ["gynecology"] = ("var(--color-sf-chip-gynecology-bg)", "var(--color-sf-chip-gynecology-fg)"),
+        ["endocrinology"] = ("var(--color-sf-chip-endocrinology-bg)", "var(--color-sf-chip-endocrinology-fg)"),
+        ["oncology"] = ("var(--color-sf-chip-oncology-bg)", "var(--color-sf-chip-oncology-fg)"),
+        ["psychiatry"] = ("var(--color-sf-chip-psychiatry-bg)", "var(--color-sf-chip-psychiatry-fg)"),
+        ["gastroenterology"] = ("var(--color-sf-chip-gastroenterology-bg)", "var(--color-sf-chip-gastroenterology-fg)"),
+        ["urology"] = ("var(--color-sf-chip-urology-bg)", "var(--color-sf-chip-urology-fg)"),
+        ["radiology"] = ("var(--color-sf-chip-radiology-bg)", "var(--color-sf-chip-radiology-fg)"),
+        ["pulmonology"] = ("var(--color-sf-chip-pulmonology-bg)", "var(--color-sf-chip-pulmonology-fg)"),
+        ["nephrology"] = ("var(--color-sf-chip-nephrology-bg)", "var(--color-sf-chip-nephrology-fg)"),
+        ["rheumatology"] = ("var(--color-sf-chip-rheumatology-bg)", "var(--color-sf-chip-rheumatology-fg)"),
+    };
+
+    private const string NeutralChipBg = "var(--color-sf-chip-neutral-bg)";
+    private const string NeutralChipFg = "var(--color-sf-chip-neutral-fg)";
+
+    private string ResolvedBg => Resolve(Value ?? string.Empty).Bg;
+    private string ResolvedFg => Resolve(Value ?? string.Empty).Fg;
+
+    private static (string Bg, string Fg) Resolve(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return (NeutralChipBg, NeutralChipFg);
+        var key = value.Trim().ToLowerInvariant();
+        foreach (var kvp in ChipColors)
+        {
+            if (key.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase))
+                return kvp.Value;
+        }
+        return (NeutralChipBg, NeutralChipFg);
+    }
+}

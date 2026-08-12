@@ -1,0 +1,106 @@
+<div class="layout">
+  <ejs-sidebar
+    #sidebar
+    id="app-sidebar"
+    [type]="sidebarType()"
+    [enableDock]="enableDock()"
+    [dockSize]="dockWidth"
+    [width]="expandedWidth"
+    [mediaQuery]="mediaQuery"
+    [isOpen]="isOpen()"
+    [closeOnDocumentClick]="isMobile()"
+    [showBackdrop]="isMobile()"
+    (close)="onSidebarClose()">
+    <div class="sidebar-inner">
+      <div class="sidebar-logo">
+        <span class="sidebar-logo-icon">
+          <svg lucideHeartPulse [size]="24" [strokeWidth]="2"></svg>
+        </span>
+        <span class="sidebar-logo-full">Meridian Health</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        @for (item of nav; track item.route) {
+          <a
+            class="sidebar-nav-link"
+            [class.active]="isActive(item.route)"
+            [routerLink]="item.route"
+            [attr.aria-current]="isActive(item.route) ? 'page' : null"
+            [title]="item.label">
+            <span class="sidebar-nav-icon">
+              @switch (item.iconKey) {
+                @case ('dashboard') { <svg lucideLayoutDashboard [size]="18" [strokeWidth]="2"></svg> }
+                @case ('schedule') { <svg lucideCalendarDays [size]="18" [strokeWidth]="2"></svg> }
+                @case ('patients') { <svg lucideUsers [size]="18" [strokeWidth]="2"></svg> }
+                @case ('waitlist') { <svg lucideClock [size]="18" [strokeWidth]="2"></svg> }
+                @case ('providers') { <svg lucideStethoscope [size]="18" [strokeWidth]="2"></svg> }
+                @case ('reports') { <svg lucideBarChart3 [size]="18" [strokeWidth]="2"></svg> }
+                @case ('settings') { <svg lucideSettings [size]="18" [strokeWidth]="2"></svg> }
+              }
+            </span>
+            <span class="sidebar-label">{{ item.label }}</span>
+          </a>
+        }
+      </nav>
+
+      @if (!isMobile()) {
+        <button
+          type="button"
+          class="sidebar-toggle"
+          (click)="toggleSidebar()"
+          aria-label="Toggle sidebar">
+          @if (isDockedCollapsed()) {
+            <svg lucideChevronRight [size]="18" [strokeWidth]="2"></svg>
+          } @else {
+            <svg lucideChevronLeft [size]="18" [strokeWidth]="2"></svg>
+          }
+        </button>
+      }
+    </div>
+  </ejs-sidebar>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        @if (isMobile()) {
+          <button
+            type="button"
+            class="hamburger-btn"
+            (click)="toggleSidebar()"
+            [attr.aria-label]="mobileOpen() ? 'Close navigation' : 'Open navigation'"
+            [attr.aria-expanded]="mobileOpen()">
+            <svg lucideMenu [size]="18" [strokeWidth]="2"></svg>
+          </button>
+        }
+        @if (headerInfo().iconKey; as iconKey) {
+          <span class="topbar-icon">
+            @switch (iconKey) {
+              @case ('dashboard') { <svg lucideLayoutDashboard [size]="20" [strokeWidth]="2"></svg> }
+              @case ('schedule') { <svg lucideCalendarDays [size]="20" [strokeWidth]="2"></svg> }
+              @case ('patients') { <svg lucideUsers [size]="20" [strokeWidth]="2"></svg> }
+              @case ('waitlist') { <svg lucideClock [size]="20" [strokeWidth]="2"></svg> }
+              @case ('providers') { <svg lucideStethoscope [size]="20" [strokeWidth]="2"></svg> }
+              @case ('reports') { <svg lucideBarChart3 [size]="20" [strokeWidth]="2"></svg> }
+              @case ('settings') { <svg lucideSettings [size]="20" [strokeWidth]="2"></svg> }
+            }
+          </span>
+        }
+        <div class="topbar-identity">
+          <h1 class="page-title">{{ headerInfo().label }}</h1>
+          @if (headerInfo().description) {
+            <p class="page-description">{{ headerInfo().description }}</p>
+          }
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <app-theme-switcher></app-theme-switcher>
+      </div>
+    </header>
+
+    <main class="content">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>
+

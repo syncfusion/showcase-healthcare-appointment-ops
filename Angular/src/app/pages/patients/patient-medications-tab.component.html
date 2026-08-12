@@ -1,0 +1,118 @@
+@if (data(); as meds) {
+  <div class="adherence-widget">
+    <ejs-progressbar
+      type="Circular"
+      [value]="meds.adherencePct"
+      minimum="0"
+      maximum="100"
+      width="120"
+      height="120"
+      trackThickness="10"
+      progressThickness="10"
+      cornerRadius="Round"
+      [progressColor]="adherenceColor(meds.adherencePct)"
+      [labelStyle]="{ color: 'var(--color-sf-fg-primary)', fontWeight: '700' }">
+    </ejs-progressbar>
+    <div class="adherence-body">
+      <div class="adherence-label">Adherence (last 90 days)</div>
+      <div class="adherence-value" [style.color]="adherenceColor(meds.adherencePct)">
+        {{ meds.adherencePct.toFixed(1) }}%
+      </div>
+      <div class="adherence-hint">{{ adherenceLabel(meds.adherencePct) }}</div>
+    </div>
+  </div>
+
+  <ejs-tab heightAdjustMode="Auto" (selecting)="onSubTabSelecting($event)">
+    <e-tabitems>
+      <e-tabitem [header]="{ text: 'Active (' + meds.active.length + ')' }"></e-tabitem>
+      <e-tabitem [header]="{ text: 'History (' + meds.history.length + ')' }"></e-tabitem>
+      <e-tabitem [header]="{ text: 'Refills (' + meds.recentRefills.length + ')' }"></e-tabitem>
+    </e-tabitems>
+  </ejs-tab>
+
+  @switch (subTab()) {
+    @case ('active') {
+      @if (meds.active.length === 0) {
+        <app-empty-state
+          title="No active medications"
+          description="This patient has no active prescriptions.">
+        </app-empty-state>
+      } @else {
+        <ejs-grid #grid [dataSource]="meds.active" [allowPaging]="true" [toolbar]="toolbar" [pageSettings]="pageSettings" [allowSorting]="true" 
+      (toolbarClick)="onToolbarClick($event)" [allowExcelExport]="true">
+          <e-columns>
+            <e-column field="medicationName" headerText="Medication" width="160"></e-column>
+            <e-column field="dosage" headerText="Dosage" width="100"></e-column>
+            <e-column field="frequency" headerText="Frequency" width="130"></e-column>
+            <e-column field="route" headerText="Route" width="100"></e-column>
+            <e-column field="prescriberName" headerText="Prescriber" width="160"></e-column>
+            <e-column field="startDate" headerText="Started" width="120">
+              <ng-template #template let-data>{{ fmtDate(data.startDate) }}</ng-template>
+            </e-column>
+            <e-column field="refillsRemaining" headerText="Refills Left" width="110"></e-column>
+            <e-column field="pharmacy" headerText="Pharmacy" width="140"></e-column>
+            <e-column field="status" headerText="Status" width="110">
+              <ng-template #template let-data><app-status-badge [status]="data.status"></app-status-badge></ng-template>
+            </e-column>
+            <e-column headerText="Action" width="140">
+              <ng-template #template let-data>
+                <button ejs-button cssClass="e-info e-small e-outline" (click)="requestRefill(data)">Request Refill</button>
+              </ng-template>
+            </e-column>
+          </e-columns>
+        </ejs-grid>
+      }
+    }
+    @case ('history') {
+      @if (meds.history.length === 0) {
+        <app-empty-state title="No medication history"></app-empty-state>
+      } @else {
+        <ejs-grid [dataSource]="meds.history" [allowPaging]="true" [pageSettings]="pageSettings" [allowSorting]="true" >
+          <e-columns>
+            <e-column field="medicationName" headerText="Medication" width="160"></e-column>
+            <e-column field="dosage" headerText="Dosage" width="100"></e-column>
+            <e-column field="frequency" headerText="Frequency" width="130"></e-column>
+            <e-column field="startDate" headerText="Started" width="120">
+              <ng-template #template let-data>{{ fmtDate(data.startDate) }}</ng-template>
+            </e-column>
+            <e-column field="endDate" headerText="Stopped" width="120">
+              <ng-template #template let-data>{{ fmtDate(data.endDate) }}</ng-template>
+            </e-column>
+            <e-column field="stopReason" headerText="Stop Reason" width="180"></e-column>
+            <e-column field="prescriberName" headerText="Prescriber" width="160"></e-column>
+            <e-column field="status" headerText="Status" width="120">
+              <ng-template #template let-data><app-status-badge [status]="data.status"></app-status-badge></ng-template>
+            </e-column>
+          </e-columns>
+        </ejs-grid>
+      }
+    }
+    @case ('refills') {
+      @if (meds.recentRefills.length === 0) {
+        <app-empty-state title="No refill history"></app-empty-state>
+      } @else {
+        <ejs-grid [dataSource]="meds.recentRefills" [allowPaging]="true" [pageSettings]="pageSettings" [allowSorting]="true" >
+          <e-columns>
+            <e-column field="medicationName" headerText="Medication" width="180"></e-column>
+            <e-column field="refillDate" headerText="Refill Date" width="150">
+              <ng-template #template let-data>{{ fmtDate(data.refillDate) }}</ng-template>
+            </e-column>
+            <e-column field="status" headerText="Status" width="120">
+              <ng-template #template let-data><app-status-badge [status]="data.status"></app-status-badge></ng-template>
+            </e-column>
+          </e-columns>
+        </ejs-grid>
+      }
+    }
+  }
+
+  @if (toast(); as message) {
+    <div class="refill-toast">✓ {{ message }}</div>
+  }
+} @else if (error(); as err) {
+  <app-error-banner [message]="err" (retry)="retryMeds()"></app-error-banner>
+} @else if (loading()) {
+  <app-loading-state inline label="Loading medications…"></app-loading-state>
+} @else {
+  <app-empty-state title="No medications" description="No medication records found for this patient."></app-empty-state>
+}

@@ -1,0 +1,200 @@
+<div>
+  @if (bannerError(); as err) {
+    <div class="dashboard-banner">
+      <app-error-banner
+        title="Unable to load dashboard"
+        [message]="err"
+        (retry)="retryBanner()">
+      </app-error-banner>
+    </div>
+  }
+
+  <div class="dashboard-grid">
+    <div id="kpis" class="kpi-row">
+      <app-kpi-card
+        title="Today's Appts"
+        [value]="(kpis()?.totalAppointments ?? '—')"
+        [loading]="!kpis() && !kpisError()">
+        <ng-template #icon>
+          <svg lucideCalendarDays [size]="16"></svg>
+        </ng-template>
+      </app-kpi-card>
+
+      <app-kpi-card
+        title="Completed"
+        [value]="(kpis()?.completedAppointments ?? '—')"
+        [loading]="!kpis() && !kpisError()">
+        <ng-template #icon>
+          <svg lucideUserCheck [size]="16"></svg>
+        </ng-template>
+      </app-kpi-card>
+
+      <app-kpi-card
+        title="Avg Wait"
+        [value]="kpis() ? (kpis()!.averageWaitTimeMinutes + 'm') : '—'"
+        [loading]="!kpis() && !kpisError()">
+        <ng-template #icon>
+          <svg lucideClock [size]="16"></svg>
+        </ng-template>
+      </app-kpi-card>
+
+      <app-kpi-card
+        title="No-Show Rate"
+        [value]="kpis() ? ((kpis()!.noShowRate * 100).toFixed(1) + '%') : '—'"
+        [loading]="!kpis() && !kpisError()">
+        <ng-template #icon>
+          <svg lucideTrendingUp [size]="16"></svg>
+        </ng-template>
+      </app-kpi-card>
+
+      <app-kpi-card
+        title="Open Waitlist"
+        [value]="(kpis()?.openWaitlistCount ?? '—')"
+        [loading]="!kpis() && !kpisError()">
+        <ng-template #icon>
+          <svg lucideListChecks [size]="16"></svg>
+        </ng-template>
+      </app-kpi-card>
+    </div>
+
+    <div id="volume" class="dashboard-card chart-card">
+      <div class="card-title">Appointment Type Mix by Department</div>
+      @if (volumeLoading()) {
+        <app-loading-state inline label="Loading appointment volume…"></app-loading-state>
+      } @else if (volumeError(); as err) {
+        <app-error-banner title="Unable to load appointment volume" [message]="err" (retry)="retryVolume()"></app-error-banner>
+      } @else if (volumeData().length === 0) {
+        <app-empty-state
+          title="No appointment volume"
+          description="No appointments in the last 30 days.">
+        </app-empty-state>
+      } @else {
+        <div [style.height]="chartFillHeight({ rows: 1, reserve: 560, cap: 620 })">
+          <ejs-chart
+            [theme]="chartTheme()"
+            [primaryXAxis]="volumePrimaryXAxis"
+            [primaryYAxis]="volumePrimaryYAxis"
+            [legendSettings]="legendSettings"
+            [tooltip]="tooltip"
+            [selectionMode]="selectionMode"
+            [highlightMode]="highlightMode"
+            height="100%">
+            <e-series-collection>
+              @for (s of appointmentTypeSeries; track s.type; let last = $last) {
+                <e-series
+                  type="StackingColumn100"
+                  [dataSource]="volumeData()"
+                  xName="department"
+                  [yName]="s.type"
+                  [name]="s.type"
+                  [fill]="s.color"
+                  [columnWidth]="columnWidth"
+                  [cornerRadius]="last ? cornerRadius : undefined">
+                </e-series>
+              }
+            </e-series-collection>
+          </ejs-chart>
+        </div>
+      }
+    </div>
+
+    <div id="utilization" class="dashboard-card chart-card">
+      <div class="card-title">Provider Utilization</div>
+      @if (utilizationLoading()) {
+        <app-loading-state inline label="Loading provider utilization…"></app-loading-state>
+      } @else if (utilizationError(); as err) {
+        <app-error-banner title="Unable to load provider utilization" [message]="err" (retry)="retryUtilization()"></app-error-banner>
+      } @else if (utilizationData().length === 0) {
+        <app-empty-state
+          title="No utilization data"
+          description="No appointments in the last 30 days.">
+        </app-empty-state>
+      } @else {
+        <div [style.height]="chartFillHeight({ rows: 1, reserve: 560, cap: 620 })">
+          <ejs-chart
+            [theme]="chartTheme()"
+            [primaryXAxis]="utilizationPrimaryXAxis"
+            [primaryYAxis]="utilizationPrimaryYAxis()"
+            [legendSettings]="hiddenLegend"
+            [tooltip]="tooltip"
+            [selectionMode]="selectionMode"
+            [highlightMode]="highlightMode"
+            height="100%">
+            <e-series-collection>
+              <e-series
+                type="Column"
+                [dataSource]="utilizationData()"
+                xName="name"
+                yName="rate"
+                name="Utilization %"
+                [pointColorMapping]="'color'"
+                [columnWidth]="columnWidth"
+                [cornerRadius]="cornerRadius">
+              </e-series>
+            </e-series-collection>
+          </ejs-chart>
+        </div>
+      }
+    </div>
+
+    <div id="upcoming" class="dashboard-card upcoming-card">
+      <div class="card-title upcoming-title" [class.upcoming-title--bordered]="upcomingItems().length > 0">
+        Today's Appointments
+      </div>
+      @if (upcomingLoading()) {
+        <div class="upcoming-body">
+          <app-loading-state inline label="Loading upcoming appointments…"></app-loading-state>
+        </div>
+      } @else if (upcomingError(); as err) {
+        <div class="upcoming-body">
+          <app-error-banner title="Unable to load upcoming appointments" [message]="err" (retry)="retryUpcoming()"></app-error-banner>
+        </div>
+      } @else if (upcomingItems().length === 0) {
+        <div class="upcoming-body">
+          <app-empty-state
+            title="No appointments today"
+            description="Today's appointments will appear here.">
+          </app-empty-state>
+        </div>
+      } @else {
+        <div class="upcoming-body" [style.maxHeight]="'clamp(340px, calc(100vh - 640px), 640px)'">
+          <ejs-listview
+            cssClass="dashboard-upcoming-list"
+            [dataSource]="upcomingItems()"
+            [fields]="{ id: 'appointmentId', text: 'patientName' }">
+            <ng-template #template let-data="">
+              <div class="upcoming-row">
+                <span class="upcoming-rail" [style.background]="data.statusFg"></span>
+
+                <div class="upcoming-avatar" [style.background]="data.statusBg" [style.color]="data.statusFg">
+                  {{ data.initials }}
+                </div>
+
+                <div class="upcoming-identity">
+                  <div class="upcoming-identity-top">
+                    <span class="upcoming-patient">{{ data.patientName }}</span>
+                    <span class="upcoming-type">{{ data.appointmentType }}</span>
+                  </div>
+                  <div class="upcoming-provider">{{ data.providerName }}</div>
+                </div>
+
+                <div class="upcoming-when">
+                  <div class="upcoming-time-row">
+                    <span class="upcoming-time">{{ data.time }}</span>
+                    <span class="upcoming-day">{{ data.day }}</span>
+                  </div>
+                  <span
+                    class="upcoming-status"
+                    [style.background]="data.statusBg"
+                    [style.color]="data.statusFg">
+                    {{ data.statusLabel }}
+                  </span>
+                </div>
+              </div>
+            </ng-template>
+          </ejs-listview>
+        </div>
+      }
+    </div>
+  </div>
+</div>

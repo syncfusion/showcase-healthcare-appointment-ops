@@ -1,0 +1,84 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.appt-kpis {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.appt-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.patient-appts-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+
+  button.e-btn {
+    padding: 2px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+}
+
+.appt-toolbar-label {
+  font-size: 13px;
+  color: var(--color-sf-fg-tertiary);
+}
+
+.book-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-row label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-sf-fg-tertiary);
+}
+
+.form-row--split {
+  flex-direction: row;
+  gap: 12px;
+}
+
+.form-row--split > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.book-error {
+  color: var(--color-sf-fg-error-primary);
+  font-size: 13px;
+}
+
+.cancel-body,
+.confirm-body {
+  padding: 8px;
+  font-size: 14px;
+}
+
+.cancel-body p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--color-sf-fg-tertiary);
+}
